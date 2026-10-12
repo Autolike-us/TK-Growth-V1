@@ -150,7 +150,7 @@
   }
   if(c.action==='comment'){
    // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
-   const live=()=>D.scope()||root,findField=()=>D.commentField(live());
+   const live=()=>D.scope()||root;let lastField=null;const findField=()=>{const f=D.commentField(live())||D.commentField(document)||(lastField&&lastField.isConnected&&D.visible(lastField)?lastField:null);if(f)lastField=f;return f;};
    if(!findField()){const open=D.commentsButton(live());T('comments button found',!!open);if(open){open.click();T('opened the comments panel');}}
    const field=await until(findField,id);T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
@@ -160,12 +160,12 @@
    const {receipts={}}=await chrome.storage.local.get('receipts');if(receipts[key])return {message:'Skipped: Aurora already attempted a comment on this post. No duplicate sent.'};
    if(D.fieldText(field).trim())throw Error('The comment box already contains text. Clear it manually before resuming.');
    const want=c.comment.replace(/\s*[\r\n]+\s*/g,' ').trim();
-   const ownComment=()=>D.commentRows(live()).some(row=>D.names(row)[0]===actor&&row.textContent.includes(want));
+   const ownComment=()=>[...D.commentRows(live()),...D.commentRows(document)].some(row=>D.names(row)[0]===actor&&row.textContent.includes(want));
    if(ownComment())return {message:'Skipped: your comment is already visible.'};
    await active(id);await think(500,1400);
    await typeHuman(want,id,async ch=>{const f=findField();if(!f)throw Error('The comment box disappeared while typing. Nothing was submitted.');D.typeChar(f,ch);});
    {const f=findField();T('typed',[...want].length,'characters');if(!f||D.fieldText(f).trim()!==want)throw Error('Typing did not complete as expected. Nothing was submitted.');}
-   const submit=await until(()=>D.commentSubmit(live()),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
+   const submit=await until(()=>D.commentSubmit(live())||D.commentSubmit(document),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
    if(!submit)throw Error('Comment prepared but Post control is unavailable. Nothing was submitted.');
    return perform(key,id,()=>submit.click(),()=>{const f=findField();return (!f||!D.fieldText(f).trim())&&ownComment();},'Posted your comment.');
   }
@@ -186,7 +186,7 @@
    ['Like state readable',kind==='video'?mark(D.likeState(D.likeButton(root,D.author(root)))!==null):'n/a'],
    ['Profile name header',kind==='profile'?mark(!!root.querySelector('[data-e2e="user-title"],[data-e2e="user-subtitle"]')):'n/a'],
    ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
-   ['Comment box found',kind==='video'?mark(!!D.commentField(root)):'n/a'],
+   ['Comment box found',kind==='video'?mark(!!(D.commentField(root)||D.commentField(document))):'n/a'],
    ['Comments button found',kind==='video'?mark(!!D.commentsButton(root)):'n/a'],
    ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
    ['Comment rows',String(D.commentRows(root).length)],
