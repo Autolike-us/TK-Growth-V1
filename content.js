@@ -54,24 +54,24 @@
   if(s.kind==='account'){
    const name=S.profileName(location.href)?.toLowerCase();if(name!==s.username)throw Error('Profile changed; refusing to act on a different account.');
    if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};
-   const header=D.profileHeader(root);
-   const ids=()=>[...header.querySelectorAll('[data-e2e="user-title"],[data-e2e="user-subtitle"]')].map(e=>e.textContent.trim().replace(/^@/,'').toLowerCase());
-   const verified=await until(()=>ids().includes(name)||(header!==document.body&&(header.innerText||'').toLowerCase().includes(name)&&ids().length),id,15000);
-   if(!verified)throw Error('Cannot verify the rendered profile. No account action sent.');
-   await until(()=>D.button(header,'Follow')||D.button(header,'Follow back')||D.button(header,'Following')||D.button(header,'Requested')||D.button(header,'Friends')||D.button(header,'Edit profile'),id);
-   if(D.button(header,'Edit profile'))return {message:'Skipped: your own profile.'};
+   const hdr=()=>D.profileHeader(D.scope()||root);let header=hdr();
+   const ids=()=>[...hdr().querySelectorAll('[data-e2e="user-title"],[data-e2e="user-subtitle"]')].map(e=>e.textContent.trim().replace(/^@/,'').toLowerCase());
+   const verified=await until(()=>ids().includes(name)||(hdr()!==document.body&&(hdr().innerText||'').toLowerCase().includes(name)&&ids().length),id,15000);
+   if(!verified)throw Error('Cannot verify the rendered profile. No account action sent.');header=hdr();
+   await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends')||D.button(hdr(),'Edit profile'),id);
+   if(D.button(hdr(),'Edit profile'))return {message:'Skipped: your own profile.'};
    if(c.action==='follow'){
-    if(D.button(header,'Following')||D.button(header,'Requested')||D.button(header,'Friends'))return {message:'Skipped: already following or requested.'};
-    const button=D.button(header,'Follow')||D.button(header,'Follow back');if(!button)throw Error('Follow control unavailable.');
+    if(D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'))return {message:'Skipped: already following or requested.'};
+    const button=D.button(hdr(),'Follow')||D.button(hdr(),'Follow back');if(!button)throw Error('Follow control unavailable.');
     if(c.dry)return {preview:true,message:`Preview: follow @${name}. No change made.`};
     if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
-    return perform(`${actor}:follow:${name}:${id}`,id,()=>button.click(),()=>D.button(header,'Following')||D.button(header,'Requested')||D.button(header,'Friends'),`Followed/requested @${name}.`);
+    return perform(`${actor}:follow:${name}:${id}`,id,()=>button.click(),()=>D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'),`Followed/requested @${name}.`);
    }
    if(c.action!=='unfollow'||c.mode!=='users')throw Error('Unfollow requires an explicit username list.');
-   const following=D.button(header,'Following')||D.button(header,'Friends');if(!following)return {message:'Skipped: not currently following.'};
+   const following=D.button(hdr(),'Following')||D.button(hdr(),'Friends');if(!following)return {message:'Skipped: not currently following.'};
    if(c.dry)return {preview:true,message:`Preview: unfollow @${name}. No change made.`};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
-   return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(header,'Follow')||D.button(header,'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(header,'Follow')||D.button(header,'Follow back'),`Unfollowed @${name}.`);
+   return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back'),`Unfollowed @${name}.`);
   }
   if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
   const author=await until(()=>D.author(root),id);
