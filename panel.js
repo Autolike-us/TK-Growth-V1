@@ -33,7 +33,7 @@
   $('copyReport').onclick=async()=>{try{const t=await globalThis.AuroraReport.build(80);await navigator.clipboard.writeText(t);$('message').textContent='Error report copied. Paste it into your message.';}catch(e){$('message').textContent='Could not copy the report: '+e.message;}};
   $('check').onclick=async()=>{const r=$('report');try{const text=globalThis.AuroraDiagnose?globalThis.AuroraDiagnose():'Check unavailable on this page.';r.textContent=text;r.hidden=false;try{await navigator.clipboard.writeText(text);$('message').textContent='Page check copied to your clipboard.';}catch{$('message').textContent='Page check shown below.';}}catch(e){r.textContent='Check failed: '+e.message;r.hidden=false;}};
   for(const action of ['pause','resume','stop'])$(action).onclick=()=>send(action);
-  let wasPaused=false;
+  let wasPaused=false,wasRunning=false;
   function render(job){
     $('status').textContent=job?`${job.status} · ${job.done??job.liked??0} ${job.config?.dry?'previewed':job.config?.action||'actions'} · ${job.skipped||0} skipped`:'Ready';
     if(job?.message)$('message').textContent=job.message;
@@ -41,6 +41,7 @@
     $('alert').classList.toggle('on',paused);$('toggle').classList.toggle('alert',paused);
     $('toggle').textContent=paused?'🔔 Aurora needs you':job?.status==='running'?'✦ Aurora · running':'✦ Aurora';
     if(paused&&!wasPaused){section.hidden=false;$('toggle').setAttribute('aria-expanded','true');}
+    const running=job?.status==='running';if(running&&!wasRunning){section.hidden=true;$('toggle').setAttribute('aria-expanded','false');}wasRunning=running;
     wasPaused=paused;
     $('preview').disabled=['running','paused'].includes(job?.status);
     $('pause').disabled=job?.status!=='running';$('resume').disabled=job?.status!=='paused';$('stop').disabled=!['running','paused'].includes(job?.status);

@@ -151,8 +151,17 @@
   if(c.action==='comment'){
    // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
    const live=()=>D.scope()||root;let lastField=null;const findField=()=>{const f=D.commentField(live())||D.commentField(document)||(lastField&&lastField.isConnected&&D.visible(lastField)?lastField:null);if(f)lastField=f;return f;};
-   if(!findField()){const open=D.commentsButton(live());T('comments button found',!!open);if(open){open.click();T('opened the comments panel');}}
-   const field=await until(findField,id);T('comment box found',!!field);
+   // Describes the comment-related parts of the page so a failed run shows what TikTok actually rendered.
+   const probe=()=>{const v=[...document.querySelectorAll('[data-e2e*="comment"]')].slice(0,14).map(e=>(e.getAttribute('data-e2e')||'')+(D.visible(e)?'+':'-')+(e.isContentEditable?'E':'')).join(' ');const ed=[...document.querySelectorAll('textarea,[contenteditable="true"],[role="textbox"]')].map(e=>e.tagName.toLowerCase()+(D.visible(e)?'+':'-')).join(' ');return `url=${location.pathname} e2e[${v}] editors[${ed}] fieldNow=${!!findField()}`;};
+   // TikTok shows the comment panel by itself once the page has loaded, so give it time before clicking the (toggle) comments icon.
+   {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}
+    for(let k=0;k<10&&!findField();k++){await active(id);await wait(400);}}
+   if(!findField()){for(let tries=0;tries<2&&!findField();tries++){const open=D.commentsButton(live());T('comments button found',!!open);if(!open)break;D.press(open);T('clicked the comments icon, attempt',tries+1);await until(findField,id,6000);}}
+   // TikTok's side panel can be showing the "You may like" tab; switch it to Comments like a person would.
+   const showCommentsTab=()=>{const t=[...document.querySelectorAll('[role="tab"],div,span,button,p')].find(e=>D.visible(e)&&!e.children.length&&/^comments?$/i.test(e.textContent.trim())&&e.closest('[role="tablist"],[class*="Tab" i]')&&e.getAttribute('aria-selected')!=='true');if(t){D.press(t);T('switched the side panel to Comments');}return !!t;};
+   if(!findField()&&showCommentsTab())await until(findField,id,3000);
+   T('comment dom',probe());
+   const field=findField();T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
    if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
@@ -166,9 +175,19 @@
    // Let the video page finish loading and re-rendering before typing; TikTok can close or rebuild the comment panel while it hydrates.
    {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}await think(1500,2800);
     let prev=findField(),still=0;while(still<4&&Date.now()-t0<25000){await active(id);await wait(400);const cur=findField();if(cur&&cur===prev)still++;else{still=0;prev=cur;}}
-    if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open);if(open){open.click();await until(findField,id);}}}
-   let reopened=false;
-   await typeHuman(want,id,async ch=>{let f=findField();for(let k=0;!f&&k<8;k++){await wait(300);f=findField();}if(!f&&!reopened){reopened=true;const open=D.commentsButton(live());T('comment box lost while typing; reopening',!!open);if(open){open.click();f=await until(findField,id,4000);}}if(!f)throw Error('The comment box disappeared while typing. Nothing was submitted.');D.typeChar(f,ch);});
+    if(!findField()){await wait(2000);if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open,probe());if(open){D.press(open);await until(findField,id,6000);}}}}
+   // If TikTok closes the comment panel mid-typing, click the comments icon again to bring it back, then carry on from where we were.
+   try{D.press(findField());}catch{}await think(300,800);
+   let typed='',recoveries=0;
+   const recover=async()=>{const btns=D.commentsButtons(live());const open=btns[0];const st=b=>b?`${b.getAttribute('aria-pressed')||b.getAttribute('aria-expanded')||'-'}`:'none';
+    for(let a=0;a<5&&open;a++){T('comment box lost; toggling the comments icon, try',a+1,'icons',btns.length,'state',st(open),probe());D.press(open);const f=await until(findField,id,2500);if(f)return f;}return null;};
+   await typeHuman(want,id,async ch=>{
+    let f=findField();if(!f){await wait(500);f=findField();}
+    if(!f&&recoveries<3){recoveries++;f=await recover();if(f){await wait(600);f=findField()||f;const now=D.fieldText(f).trim();if(now&&now!==typed){f.focus();if('value' in f)f.value='';else{document.execCommand('selectAll');document.execCommand('delete');}}if(D.fieldText(f).trim()!==typed)for(const x of typed)D.typeChar(f,x);T('comment box restored',recoveries);}}
+    if(!f){T('comment box gone',probe());throw Error('The comment box disappeared while typing. Nothing was submitted.');}
+    D.typeChar(f,ch);typed+=ch;
+    if(typed.length===1){await wait(500);T('after the first character, box present',!!findField(),location.pathname);}
+   });
    {const f=findField();T('typed',[...want].length,'characters');if(!f||D.fieldText(f).trim()!==want)throw Error('Typing did not complete as expected. Nothing was submitted.');}
    const submit=await until(()=>D.commentSubmit(live())||D.commentSubmit(document),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
    if(!submit)throw Error('Comment prepared but Post control is unavailable. Nothing was submitted.');

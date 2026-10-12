@@ -97,6 +97,12 @@ async function tick(){
  finally{busy=false;}
 }
 chrome.alarms.onAlarm.addListener(a=>{if(a.name==='step')tick();});
+// Reuses the site tab you already have open (most recently used first) so no extra tab appears; opens a new one only when there is none.
+async function taskTab(url){
+ try{const tabs=(await chrome.tabs.query({url:base+'*'})).filter(t=>t.id!=null).sort((a,b)=>(b.active?1:0)-(a.active?1:0)||(b.lastAccessed||0)-(a.lastAccessed||0));
+  if(tabs[0]){const t=await chrome.tabs.update(tabs[0].id,{url,active:true});await dlog('info','Using your open tab');return t||tabs[0];}}catch{}
+ return chrome.tabs.create({url});
+}
 async function resumeTask(){
  const {job}=await chrome.storage.local.get('job');if(!job)throw Error('Create a task first.');
  if(job.inFlight)throw Error('Interrupted action: check TikTok manually, then stop this task and create a new task for remaining targets.');
@@ -116,7 +122,7 @@ chrome.runtime.onMessage.addListener((m,s,respond)=>{
   if(m.action==='start'){
    if(busy)throw Error('A step is finishing. Try again shortly.');const old=(await chrome.storage.local.get('job')).job;if(['running','paused'].includes(old?.status))throw Error('Stop the current task first.');
    const config=AuroraEngine.config(m.config),queue=AuroraEngine.initial(config);if(!queue.length)throw Error('All targets are excluded.');
-   await chrome.storage.local.set({config:m.config});const tab=await chrome.tabs.create({url:queue[0].url});
+   await chrome.storage.local.set({config:m.config});const tab=await taskTab(queue[0].url);
    const job={version:2,id:crypto.randomUUID(),config,queue,tabId:tab.id,status:'running',counts:{like:0,follow:0,unfollow:0,comment:0},done:0,liked:0,previewed:0,skipped:0,seen:[],seenUsers:[],nextAt:Date.now()+2000,message:`${config.dry?'Preview':'Live'} ${config.action} task started. Waiting for TikTok.`};
    await save(job);await log(job.message);await dlog('info',job.message,{action:config.action,mode:config.mode,target:String(config.target||'').slice(0,200),limit:config.limit,perUser:config.perUser,scanLimit:config.scanLimit,delay:config.delay,dailyCap:config.dailyCap,preview:config.dry,steps:queue.length});await schedule(job);return{ok:true,message:job.message};
   }
