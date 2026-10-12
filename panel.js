@@ -6,13 +6,13 @@
   const shadow = host.attachShadow({mode:'closed'});
   shadow.innerHTML = `<style>
     :host{all:initial;font:14px system-ui;color:#302442}*{box-sizing:border-box}
-    button,input{font:inherit}button{cursor:pointer;border:1px solid #dacded;border-radius:12px;background:#f3edff;color:#402865;padding:10px 14px}button:disabled{opacity:.45;cursor:default}
-    #toggle,.primary{background:#7043bd;color:white;border:0;box-shadow:0 5px 20px #25134426}
-    section{width:min(340px,calc(100vw - 40px));padding:20px;background:#fffafd;border:1px solid #e3d5f1;border-radius:20px;box-shadow:0 12px 50px #22103233;margin-bottom:10px}
+    button,input{font:inherit}button{cursor:pointer;border:1px solid #dacded;border-radius:12px;background:#fff0f3;color:#7a1631;padding:10px 14px}button:disabled{opacity:.45;cursor:default}
+    #toggle,.primary{background:#fe2c55;color:white;border:0;box-shadow:-3px 3px 0 #25f4ee,0 8px 24px #fe2c5566;font-weight:650}#toggle{border-radius:999px;padding:11px 18px}#toggle.alert{background:#fe2c55;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}#alert{display:none;margin:0 0 12px;padding:10px 12px;border-radius:14px;background:#fff0f3;border:1px solid #f43f5e55;color:#b4153a;font-weight:600}#alert.on{display:block}
+    section{width:min(340px,calc(100vw - 40px));padding:20px;background:linear-gradient(160deg,#ffffff,#fff1f4);border:1px solid #fe2c5533;border-radius:24px;box-shadow:0 12px 50px #22103233;margin-bottom:10px}
     [hidden]{display:none}h2{margin:0;font-size:22px}p{line-height:1.5;margin:12px 0}small{color:#685d76}
     input{width:100%;padding:11px;border:1px solid #d8cae8;border-radius:10px;margin:8px 0 12px;background:white;color:#302442}
     .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}#status{font-weight:600}#message{overflow-wrap:anywhere}label{display:block;margin-top:15px}
-  </style><section hidden><h2>Aurora <small>1.0.0</small></h2>
+  </style><section hidden><h2>✦ Aurora <small>1.0.0</small></h2><div id="alert" role="alert">🔔 Paused — needs you. Check the message, then press Resume.</div>
     <p id="status">Ready</p><p id="message" role="status" aria-live="polite">Preview a profile to check discovery without sending likes.</p>
     <label for="target">Profile username</label><input id="target" placeholder="@username">
     <button id="preview" class="primary">Preview profile</button>
@@ -31,9 +31,15 @@
   $('preview').onclick=()=>send('previewProfile',{target:$('target').value});
   $('studio').onclick=()=>send('openStudio');
   for(const action of ['pause','resume','stop'])$(action).onclick=()=>send(action);
+  let wasPaused=false;
   function render(job){
     $('status').textContent=job?`${job.status} · ${job.done??job.liked??0} ${job.config?.dry?'previewed':job.config?.action||'actions'} · ${job.skipped||0} skipped`:'Ready';
     if(job?.message)$('message').textContent=job.message;
+    const paused=job?.status==='paused',section=shadow.querySelector('section');
+    $('alert').classList.toggle('on',paused);$('toggle').classList.toggle('alert',paused);
+    $('toggle').textContent=paused?'🔔 Aurora needs you':job?.status==='running'?'✦ Aurora · running':'✦ Aurora';
+    if(paused&&!wasPaused){section.hidden=false;$('toggle').setAttribute('aria-expanded','true');}
+    wasPaused=paused;
     $('preview').disabled=['running','paused'].includes(job?.status);
     $('pause').disabled=job?.status!=='running';$('resume').disabled=job?.status!=='paused';$('stop').disabled=!['running','paused'].includes(job?.status);
   }

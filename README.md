@@ -27,6 +27,10 @@ Discovery is bounded to your selected limit, at most 20 scroll attempts, and sto
 
 TikTok does not share Instagram's place feeds or liker-list interface, so those sources are omitted. Post-age and skip-video filters are unavailable in this version. No DMs, scheduling, or guaranteed follower growth is included.
 
+## Alerts when a task stops
+
+When a task pauses (sign-in, verification, TikTok layout problem, restart) Aurora shows a desktop notification, turns the toolbar icon badge red (`!`), pops open the on-page panel with a pulsing red button, and shows a **Resume / Stop** banner in the studio and popup. A green `ON` badge means a task is running and `✓` means it finished. Page-load timing errors that happen before any click are retried automatically up to 3 times.
+
 ## Interruption and verification
 
 Preview resets on when the studio opens or the action changes. Errors and detected sign-in, verification, or activity restrictions pause execution. Pause/stop cannot undo a click already sent. Browser/extension restarts pause active tasks. If a worker was interrupted during a live action, its outcome is unknown: inspect TikTok manually, stop the task, and create a new task for the remaining targets. The extension will not automatically resubmit that interrupted step.
