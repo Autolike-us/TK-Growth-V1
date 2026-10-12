@@ -150,3 +150,5 @@ body.popup{width:760px;height:600px;min-height:580px;overflow-y:auto}
 #debugText{white-space:pre-wrap;font:12px/1.55 ui-monospace,Consolas,monospace;background:var(--tint);border-radius:14px;padding:14px;max-height:540px;overflow:auto;overflow-wrap:anywhere;color:var(--ink);margin:0}
 #debug .card-head span{display:flex;gap:8px;flex-wrap:wrap}
 #debug .primary{flex:none}
+
+.presets{margin-top:22px;padding-top:16px;border-top:1px dashed var(--border)}.presets .row{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.presets input{width:100%;box-sizing:border-box}

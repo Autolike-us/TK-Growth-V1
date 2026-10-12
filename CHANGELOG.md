@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.0
+- New: the form is remembered when the popup closes, a Reset to defaults button, and named saved setups (save, load, rename, delete).
+
 ## 1.4.2
 - Fix: broader comment-box detection (any TikTok comment editor, not only tagged ones), waits for the video page to settle before typing, reopens the comments panel if TikTok closes it.
 
