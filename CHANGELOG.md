@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+- The popup closes and the on-page panel folds away once a task starts running.
+- Comments: if TikTok closes the comment panel while typing, Aurora clicks the comments icon to bring it back (up to 4 tries, cycling icons), restores the text typed so far and carries on. The trace now records the page URL and what happens right after the first character.
+
 ## 1.5.1
 - Starting a task now reuses the TikTok tab you already have open instead of opening a new one.
 - Comments: waits for TikTok to show its own comment panel before clicking the (toggle) comments icon, retries the icon, and records what the page rendered if the box is lost.
