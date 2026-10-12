@@ -82,12 +82,12 @@
   if(!author||author!==urlAuthor)throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
   if(c.action==='like'){
-   const button=await until(()=>D.likeButton(root),id);if(!button)throw Error('Cannot identify a unique video Like control.');
+   const button=await until(()=>D.likeButton(root,author),id);if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}).`);
    const state=D.likeState(button);if(state===true)return {message:'Skipped: video already liked.'};
    if(state!==false)throw Error('Cannot read whether this video is liked. No click sent.');
    if(c.dry)return {preview:true,message:'Preview: eligible video like. No change made.'};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
-   return perform(`${actor}:like:${S.pageKey(location.href)}:${id}`,id,()=>button.click(),()=>D.likeState(D.likeButton(root))===true,'Liked video.');
+   return perform(`${actor}:like:${S.pageKey(location.href)}:${id}`,id,()=>button.click(),()=>D.likeState(D.likeButton(root,author))===true,'Liked video.');
   }
   if(c.action==='comment'){
    const field=await until(()=>D.commentField(root),id);
