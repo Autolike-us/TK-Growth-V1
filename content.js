@@ -43,7 +43,9 @@
   const root=D.scope();T('step',s.kind,c.action||'','container',root.tagName.toLowerCase()+(root.id?'#'+root.id:''));
   if(S.pageKey(location.href)!==S.pageKey(s.url))throw Error('TikTok changed targets. Nothing was submitted.');
   if(s.kind==='posts'){
-   const read=()=>[...root.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean);
+   // Read only the profile/hashtag video grid (never menus or side panels), and on a profile only that profile's own videos.
+   const grid='[data-e2e="user-post-item-list"],[data-e2e="challenge-item-list"]';
+   const read=()=>{const r=D.scope()||root,area=r.querySelector(grid)||r;return [...area.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean).filter(u=>!s.username||u.split('/')[3]==='@'+s.username);};
    const empty=()=>{if(!s.username)return null;const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':null;};
    const ready=await until(()=>read().length||empty(),id,15000);
    if(!ready)throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
@@ -92,7 +94,9 @@
   if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
   const urlAuthor=new URL(s.url).pathname.split('/')[1].slice(1).toLowerCase();
   const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);T('author found',!!author);
-  if(!author||author!==urlAuthor)throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
+  // TikTok also accepts the numeric account id in the address; the video id (already matched above) is then the proof of identity.
+  if(!author||(!/^\d+$/.test(urlAuthor)&&author!==urlAuthor))throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
+  if(actor&&author===actor)return {message:'Skipped: this is your own post.'};
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
   if(c.action==='like'){
    const button=await until(()=>D.likeButton(root,author),id);if(!button&&/\/photo\//.test(location.pathname))return {message:'Skipped: Like control not found on this photo post (photo layouts can differ). Use Check page if this repeats.'};if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}).`);

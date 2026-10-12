@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2
+- **Fixed: Aurora could pick videos that were not on the target profile** (for example your own video linked from a side panel) and try to act on them. Profile steps now read only the profile's own video grid, and only videos by that profile.
+- **Your own posts are never liked or commented on**; they are skipped with a message.
+- A numeric account id in a video address (TikTok accepts both) no longer fails the author check; the matching video id is the proof.
+
 ## 1.2.1
 - **Fixed: a comment could be posted but then reported as unconfirmed** when TikTok replaced the comment box while typing. Aurora now looks the box up fresh each time and confirms against the live page.
 - Page helpers no longer throw when an element disappears mid-step; the debug log now includes the page-side error stack.
