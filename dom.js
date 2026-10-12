@@ -1,0 +1,21 @@
+globalThis.AuroraDOM={
+ visible:e=>!!e?.getClientRects().length,
+ controls(root){return [...root.querySelectorAll('button,[role="button"]')].filter(this.visible);},
+ text(e){const copy=e.cloneNode(true);copy.querySelectorAll('svg').forEach(x=>x.remove());return copy.textContent.trim();},
+ button(root,label){return this.controls(root).find(e=>this.text(e)===label||e.getAttribute('aria-label')===label);},
+ scope(){return [...document.querySelectorAll('[data-e2e="browse-video-container"],[class*="DivBrowserModeContainer"],main,[role="main"]')].find(this.visible)||null;},
+ profileHeader(root){return root.querySelector('[data-e2e="user-page"]')||root;},
+ names(root){return [...new Set([...root.querySelectorAll('a[href]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).filter(Boolean))];},
+ author(root){const e=[...root.querySelectorAll('[data-e2e="browse-username"],a[data-e2e="video-author-uniqueid"]')].find(this.visible);return AuroraSelectors.profileName(e?.href||e?.closest('a')?.href||'')?.toLowerCase()||null;},
+ commentRows(root){return [...root.querySelectorAll('[data-e2e="comment-item"],[data-e2e="comment-level-1"]')].filter(this.visible);},
+ commenters(root){return [...new Set(this.commentRows(root).map(row=>this.names(row)[0]).filter(Boolean))];},
+ listDialog(source){return [...document.querySelectorAll('[role="dialog"]')].filter(this.visible).find(e=>new RegExp(`\\b${source}\\b`,'i').test(e.getAttribute('aria-label')||e.textContent||''))||null;},
+ scrollContainer(root){return [root,...root.querySelectorAll('div,ul')].filter(e=>e.clientHeight>80&&e.scrollHeight>e.clientHeight+40&&/auto|scroll/.test(getComputedStyle(e).overflowY)).sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];},
+ actor(){return [...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean)||null;},
+ likeButton(root){const matches=[...root.querySelectorAll('[data-e2e="browse-like-icon"],button[aria-label="Like video"],button[aria-label="Unlike video"]')].filter(this.visible);if(matches.length!==1)return null;const e=matches[0];return e.closest('button,[role="button"]')||e;},
+ likeState(button){if(!button)return null;const pressed=button.getAttribute('aria-pressed');if(pressed==='true')return true;if(pressed==='false')return false;const label=button.getAttribute('aria-label');if(label==='Unlike video')return true;if(label==='Like video')return false;const paints=[...button.querySelectorAll('svg,path')].map(e=>getComputedStyle(e).fill);if(paints.some(p=>/^rgba?\(25[45], 44, 85(?:, 1)?\)$/.test(p)))return true;if(paints.some(p=>/^rgba?\(22, 24, 35(?:, [\d.]+)?\)$/.test(p)))return false;return null;},
+ commentField(root){return [...root.querySelectorAll('textarea,[contenteditable="true"][data-e2e="comment-input"],[data-e2e="comment-input"] [contenteditable="true"]')].filter(this.visible).find(e=>e.isContentEditable||/comment/i.test(e.placeholder||e.getAttribute('aria-label')||''))||null;},
+ fieldText(field){return 'value' in field?field.value:field.textContent;},
+ fillComment(field,text){field.focus();if('value' in field){Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(field,text);field.dispatchEvent(new Event('input',{bubbles:true}));}else{if(!document.execCommand('insertText',false,text))throw Error('TikTok comment editor did not accept text. Nothing submitted.');}},
+ commentSubmit(root){return [...root.querySelectorAll('[data-e2e="comment-post"],button,[role="button"]')].filter(this.visible).find(e=>(e.getAttribute('data-e2e')==='comment-post'||this.text(e)==='Post')&&!e.disabled&&e.getAttribute('aria-disabled')!=='true')||null;}
+};

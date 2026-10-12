@@ -1,0 +1,53 @@
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+import json
+ROOT=Path(__file__).resolve().parent.parent
+checks=[]
+URL='https://www.tiktok.com/@alice/video/123'
+NAV='<nav><a data-e2e="nav-profile" href="/@me">Profile</a></nav>'
+VIDEO='<main><a data-e2e="browse-username" href="/@alice">alice</a><button data-e2e="browse-like-icon" aria-pressed="false">Like</button><div data-e2e="comment-item"><a href="/@bob">bob</a><p>Hello</p></div><textarea aria-label="Add comment"></textarea><button data-e2e="comment-post">Post</button></main>'
+PROFILE='<main><section data-e2e="user-page"><h1 data-e2e="user-title">alice</h1><button id="follow">Follow</button></section><a href="/@alice/video/123">Video</a></main>'
+MOCK='''window.data={job:{id:'test',status:'running'},receipts:{},history:[]};window.listeners=[];window.clicks=0;
+window.chrome={runtime:{id:'extension',onMessage:{addListener:f=>listeners.push(f)},sendMessage:async()=>({ok:true}),getURL:p=>'https://fixture.test/'+p},storage:{local:{get:async()=>structuredClone(data),set:async x=>Object.assign(data,structuredClone(x))},onChanged:{addListener:()=>{}}}};
+const nativeTimeout=window.setTimeout;window.setTimeout=(f,ms,...args)=>nativeTimeout(f,Math.min(ms,10),...args);
+document.addEventListener('click',e=>{if(e.target.closest('main button'))clicks++});'''
+with sync_playwright() as p:
+ browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+ context=browser.new_context()
+ context.route('**/*',lambda r:r.fulfill(status=200,content_type='text/html',body='<html><body></body></html>'))
+ page=context.new_page()
+ def fixture(body,url=URL,actor=True):
+  page.goto(url);page.set_content((NAV if actor else '')+body);page.add_script_tag(content=MOCK)
+  for f in ['selectors.js','dom.js','content.js']:page.add_script_tag(path=str(ROOT/f))
+ def step(action='like',dry=True,kind='engage',url=URL,**extra):
+  c=dict(action=action,dry=dry,mode='posts',exclude=[],maxAge=0,videos=False,scanLimit=2,perUser=2,comment='Nice video!');c.update(extra)
+  return page.evaluate('''arg=>new Promise(resolve=>listeners[0]({action:'step',step:{kind:arg.kind,url:arg.url,username:'alice'},config:arg.c,jobId:'test'},{id:'extension'},resolve))''',dict(kind=kind,url=url,c=c))
+ def check(name,condition):
+  assert condition,name;checks.append(name)
+ fixture(VIDEO);r=step();check('video like preview sends no clicks',r.get('preview') and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("document.querySelector('[data-e2e=browse-like-icon]').setAttribute('aria-pressed','true')");r=step();check('already liked video is skipped',not r.get('preview') and 'already liked' in r.get('message','') and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("document.querySelector('[data-e2e=browse-like-icon]').removeAttribute('aria-pressed')");r=step(dry=False);check('unknown like state fails closed',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("()=>{const b=document.querySelector('[data-e2e=browse-like-icon]');b.removeAttribute('aria-pressed');b.innerHTML='<svg><path fill=\"rgba(22, 24, 35, 0.2)\" d=\"M0 0h10v10H0z\" /></svg>';}");r=step();check('TikTok neutral heart paint reads unliked state',r.get('preview'))
+ fixture(VIDEO);page.evaluate("()=>{const b=document.querySelector('[data-e2e=browse-like-icon]');b.removeAttribute('aria-pressed');b.innerHTML='<svg><path fill=\"rgb(254, 44, 85)\" d=\"M0 0h10v10H0z\" /></svg>';}");r=step();check('TikTok red heart paint prevents unlike click','already liked' in r.get('message','') and page.evaluate('clicks')==0)
+ fixture(VIDEO,actor=False);r=step(dry=False);check('unidentified account sends no action',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("()=>{document.querySelector('[data-e2e=browse-like-icon]').onclick=e=>e.currentTarget.setAttribute('aria-pressed','true')}");r=step(dry=False);check('like confirms changed state in fixture',r.get('performed') and page.evaluate('clicks')==1)
+ r=step(dry=False);check('repeated like does not toggle unlike',page.evaluate('clicks')==1 and not r.get('performed'))
+ fixture(VIDEO);r=step(action='comment');check('comment preview never types or posts',r.get('preview') and page.locator('textarea').input_value()=='' and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.locator('textarea').fill('existing draft');r=step(action='comment',dry=False);check('existing draft preserved',bool(r.get('error')) and page.locator('textarea').input_value()=='existing draft' and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("data.receipts['me:comment:video:123']={status:'attempted'}");r=step(action='comment',dry=False);check('uncertain comment is not resent',not r.get('performed') and page.locator('textarea').input_value()=='' and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate('''()=>{document.querySelector('[data-e2e=comment-post]').onclick=()=>{const t=document.querySelector('textarea');const row=document.createElement('div');row.dataset.e2e='comment-item';row.innerHTML='<a href="/@me">me</a><p></p>';row.querySelector('p').textContent=t.value;document.querySelector('main').append(row);t.value='';}}''');r=step(action='comment',dry=False);check('comment requires own rendered receipt',r.get('performed') and page.evaluate('clicks')==1)
+ fixture(VIDEO);r=step(kind='users',action='follow',source='commenters') if False else page.evaluate('''()=>new Promise(resolve=>listeners[0]({action:'step',step:{kind:'users',source:'commenters',url:location.href},config:{scanLimit:1},jobId:'test'},{id:'extension'},resolve))''');check('commenter discovery excludes video author',r.get('users')==['bob'])
+ fixture(VIDEO);r=step(url='https://www.tiktok.com/@other/video/456');check('navigation mismatch prevents action',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(VIDEO);page.evaluate("data.job.status='paused'");r=step(dry=False);check('paused task never clicks',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(PROFILE,'https://www.tiktok.com/@alice');r=step(action='follow',kind='account',url='https://www.tiktok.com/@alice',mode='users');check('follow preview sends no clicks',r.get('preview') and page.evaluate('clicks')==0)
+ fixture(PROFILE,'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Following'}");r=step(action='follow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('follow confirms changed state',r.get('performed') and page.evaluate('clicks')==1)
+ fixture(PROFILE.replace('>Follow<','>Following<'),'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Follow'}");r=step(action='unfollow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('explicit unfollow confirms immediate state change',r.get('performed') and page.evaluate('clicks')==1)
+ fixture(VIDEO);page.evaluate("document.querySelector('main').insertAdjacentHTML('beforeend','<button data-e2e=\"browse-like-icon\" aria-pressed=\"false\">Like</button>')");r=step(dry=False);check('ambiguous video like controls fail closed',bool(r.get('error')) and page.evaluate('clicks')==0)
+ for f in ['dashboard.html','popup.html']:
+  page.goto('https://fixture.test/'+f);page.set_content((ROOT/f).read_text());page.add_script_tag(content=MOCK);page.evaluate('data.job=null');page.add_style_tag(path=str(ROOT/'style.css'));page.add_script_tag(path=str(ROOT/'dashboard.js'));page.wait_for_timeout(100)
+  check(f+' preview defaults on',page.locator('#dry').is_checked() and 'Extension error' not in page.locator('#notice').inner_text())
+  check(f+' only supported discovery sources',set(page.locator('#mode option').evaluate_all('(es)=>es.map(e=>e.value)'))=={'users','followers','following','commenters','hashtag','posts'})
+  page.select_option('#action','unfollow');check(f+' unfollow restricts discovery',page.locator('#mode').input_value()=='users' and page.locator('#mode option:not([value=users])').evaluate_all('(es)=>es.every(e=>e.disabled)'))
+  page.screenshot(path=str(ROOT.parent/(f.replace('.html','')+'-tiktok.png')),full_page=True)
+ browser.close()
+print(json.dumps({'passed':len(checks),'checks':checks},indent=2))
