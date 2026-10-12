@@ -1,14 +1,13 @@
 /* Aurora • TikTok Studio — TikTok-inspired theme (black / hot pink / cyan) */
 *{box-sizing:border-box}
 body{
-  --bg:#fff7f9;--surface:rgba(255,255,255,.86);--solid:#fff;--border:rgba(254,44,85,.16);--muted:#76707a;--ink:#161823;
+  --bg:#f8fdfd;--surface:rgba(255,255,255,.86);--solid:#fff;--border:rgba(22,24,35,.12);--muted:#76707a;--ink:#161823;
   --accent:#fe2c55;--accent2:#25f4ee;--ok:#12a594;--warn:#f59e0b;--bad:#fe2c55;--tint:rgba(254,44,85,.08);
-  --shadow:0 14px 40px -18px rgba(254,44,85,.35);--grad:linear-gradient(135deg,#fe2c55,#ff6b8b);--grad2:linear-gradient(90deg,#25f4ee,#fe2c55);
+  --shadow:0 14px 40px -20px rgba(22,24,35,.35);--grad:linear-gradient(135deg,#fe2c55,#ff6b8b);--grad2:linear-gradient(90deg,#25f4ee,#fe2c55);
   margin:0;color:var(--ink);font:15px/1.6 ui-rounded,"SF Pro Rounded","Segoe UI Variable","Segoe UI",system-ui,sans-serif;
   background:
-    radial-gradient(900px 520px at 6% -8%,rgba(254,44,85,.16),transparent 60%),
-    radial-gradient(800px 520px at 100% 0%,rgba(37,244,238,.22),transparent 60%),
-    radial-gradient(900px 600px at 55% 112%,rgba(254,44,85,.08),transparent 60%),
+    radial-gradient(900px 520px at 6% -8%,rgba(37,244,238,.18),transparent 60%),
+    radial-gradient(800px 520px at 100% 0%,rgba(254,44,85,.08),transparent 60%),
     var(--bg);
   background-attachment:fixed;
 }
@@ -29,19 +28,20 @@ aside{position:fixed;width:244px;height:100vh;background:var(--surface);backdrop
 small{font-size:10px;letter-spacing:1.6px;color:var(--muted)}
 aside small{margin-top:8px;font-size:8px}
 nav{display:grid;gap:8px;margin-top:42px}
-nav button{text-align:left;border:0;background:transparent;border-radius:999px;padding:11px 18px;color:var(--muted);font-weight:600}
+nav button{text-align:left;border:0;background:transparent;border-radius:10px;padding:11px 18px;color:var(--muted);font-weight:600}
 nav button:hover{background:var(--tint);color:var(--ink)}
 nav button.selected,.selected{background:var(--tint);color:var(--accent);box-shadow:inset 0 0 0 1px var(--border)}
 .aside-bottom{margin-top:auto;font-size:12px;color:var(--muted)}
-.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid var(--border);border-radius:999px;padding:7px 14px;color:var(--accent);background:var(--tint)}
+.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;border:1px solid var(--border);border-radius:8px;padding:7px 14px;color:var(--accent);background:var(--tint)}
 
 /* base controls */
 button,input,select,textarea{font:inherit}
-button{cursor:pointer;border:1px solid var(--border);border-radius:14px;background:var(--solid);color:inherit;padding:10px 18px;font-weight:600;transition:transform .15s,box-shadow .15s,border-color .15s}
+button{cursor:pointer;border:1px solid var(--border);border-radius:10px;background:var(--solid);color:inherit;padding:10px 18px;font-weight:600;transition:transform .15s,box-shadow .15s,border-color .15s}
 button:hover:not(:disabled){border-color:var(--accent);transform:translateY(-1px);box-shadow:0 8px 18px -10px rgba(254,44,85,.55)}
 button:disabled{opacity:.4;cursor:default}
-.primary{background:var(--accent);color:#fff;border:0;flex:1;box-shadow:-3px 3px 0 #25f4ee,0 14px 24px -12px rgba(254,44,85,.8)}
-.primary:hover:not(:disabled){box-shadow:-4px 4px 0 #25f4ee,0 16px 28px -12px rgba(254,44,85,.9);border-color:transparent}
+.primary{background:#121218;color:#fff;border:0;flex:1;border-radius:10px;box-shadow:-3px 3px 0 #25f4ee,3px -3px 0 #fe2c55}
+body.dark .primary{background:#fff;color:#121218}
+.primary:hover:not(:disabled){box-shadow:-5px 5px 0 #25f4ee,5px -5px 0 #fe2c55;border-color:transparent;transform:translateY(0)}
 input:not([type=checkbox]),select,textarea{width:100%;background:var(--solid);color:inherit;border:1px solid var(--border);border-radius:14px;padding:12px 14px;outline:none;transition:box-shadow .15s,border-color .15s}
 select option{background:var(--solid)}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px var(--tint)}
@@ -84,7 +84,7 @@ footer{font-size:11px;color:var(--muted);margin:30px 0}
 #notice{font-size:13px;color:var(--accent);background:var(--tint);border-radius:14px;padding:11px 14px;margin:0 0 16px;overflow-wrap:anywhere}
 
 /* status chip (value text is set by script; colour comes from body[data-status]) */
-#status{display:inline-block;font-size:18px;text-transform:capitalize;padding:4px 14px;border-radius:999px;background:var(--tint);color:var(--accent);margin-top:6px}
+#status{display:inline-block;font-size:18px;text-transform:capitalize;padding:4px 14px;border-radius:8px;background:var(--tint);color:var(--accent);margin-top:6px}
 body[data-status=running] #status{background:rgba(31,174,124,.15);color:var(--ok)}
 body[data-status=paused] #status{background:rgba(244,63,94,.15);color:var(--bad);animation:pulse 1.6s ease-in-out infinite}
 body[data-status=completed] #status{background:rgba(37,244,238,.18);color:var(--ok)}
