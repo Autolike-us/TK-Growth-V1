@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.3
+- Comments: the comments icon is now chosen as the one nearest the video on screen, pressed with a full pointer/mouse event sequence, and toggled up to 5 times (same icon, like a manual hide then show) when the panel vanishes; trace records the icon state.
+
 ## 1.5.2
 - The popup closes and the on-page panel folds away once a task starts running.
 - Comments: if TikTok closes the comment panel while typing, Aurora clicks the comments icon to bring it back (up to 4 tries, cycling icons), restores the text typed so far and carries on. The trace now records the page URL and what happens right after the first character.

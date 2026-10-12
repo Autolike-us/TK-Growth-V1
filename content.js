@@ -156,7 +156,7 @@
    // TikTok shows the comment panel by itself once the page has loaded, so give it time before clicking the (toggle) comments icon.
    {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}
     for(let k=0;k<10&&!findField();k++){await active(id);await wait(400);}}
-   if(!findField()){for(let tries=0;tries<2&&!findField();tries++){const open=D.commentsButton(live());T('comments button found',!!open);if(!open)break;open.click();T('clicked the comments icon, attempt',tries+1);await until(findField,id,6000);}}
+   if(!findField()){for(let tries=0;tries<2&&!findField();tries++){const open=D.commentsButton(live());T('comments button found',!!open);if(!open)break;D.press(open);T('clicked the comments icon, attempt',tries+1);await until(findField,id,6000);}}
    T('comment dom',probe());
    const field=findField();T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
@@ -172,10 +172,11 @@
    // Let the video page finish loading and re-rendering before typing; TikTok can close or rebuild the comment panel while it hydrates.
    {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}await think(1500,2800);
     let prev=findField(),still=0;while(still<4&&Date.now()-t0<25000){await active(id);await wait(400);const cur=findField();if(cur&&cur===prev)still++;else{still=0;prev=cur;}}
-    if(!findField()){await wait(2000);if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open,probe());if(open){open.click();await until(findField,id,6000);}}}}
+    if(!findField()){await wait(2000);if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open,probe());if(open){D.press(open);await until(findField,id,6000);}}}}
    // If TikTok closes the comment panel mid-typing, click the comments icon again to bring it back, then carry on from where we were.
    let typed='',recoveries=0;
-   const recover=async()=>{for(let a=0;a<4;a++){const btns=D.commentsButtons(live());T('comment box lost; clicking the comments icon, try',a+1,'icons',btns.length,probe());const open=btns[a%Math.max(btns.length,1)];if(!open)break;open.click();const f=await until(findField,id,3500);if(f)return f;}return null;};
+   const recover=async()=>{const btns=D.commentsButtons(live());const open=btns[0];const st=b=>b?`${b.getAttribute('aria-pressed')||b.getAttribute('aria-expanded')||'-'}`:'none';
+    for(let a=0;a<5&&open;a++){T('comment box lost; toggling the comments icon, try',a+1,'icons',btns.length,'state',st(open),probe());D.press(open);const f=await until(findField,id,2500);if(f)return f;}return null;};
    await typeHuman(want,id,async ch=>{
     let f=findField();if(!f){await wait(500);f=findField();}
     if(!f&&recoveries<3){recoveries++;f=await recover();if(f){await wait(600);f=findField()||f;const now=D.fieldText(f).trim();if(now&&now!==typed){f.focus();if('value' in f)f.value='';else{document.execCommand('selectAll');document.execCommand('delete');}}if(D.fieldText(f).trim()!==typed)for(const x of typed)D.typeChar(f,x);T('comment box restored',recoveries);}}
