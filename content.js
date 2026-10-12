@@ -55,7 +55,9 @@
    const name=S.profileName(location.href)?.toLowerCase();if(name!==s.username)throw Error('Profile changed; refusing to act on a different account.');
    if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};
    const header=D.profileHeader(root);
-   const title=await until(()=>header.querySelector('[data-e2e="user-title"]'),id,15000);if(!title||title.textContent.trim().replace(/^@/,'').toLowerCase()!==name)throw Error('Cannot verify the rendered profile. No account action sent.');
+   const ids=()=>[...header.querySelectorAll('[data-e2e="user-title"],[data-e2e="user-subtitle"]')].map(e=>e.textContent.trim().replace(/^@/,'').toLowerCase());
+   const verified=await until(()=>ids().includes(name)||(header!==document.body&&(header.innerText||'').toLowerCase().includes(name)&&ids().length),id,15000);
+   if(!verified)throw Error('Cannot verify the rendered profile. No account action sent.');
    await until(()=>D.button(header,'Follow')||D.button(header,'Follow back')||D.button(header,'Following')||D.button(header,'Requested')||D.button(header,'Friends')||D.button(header,'Edit profile'),id);
    if(D.button(header,'Edit profile'))return {message:'Skipped: your own profile.'};
    if(c.action==='follow'){
