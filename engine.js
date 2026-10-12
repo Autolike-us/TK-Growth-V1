@@ -8,8 +8,8 @@ globalThis.AuroraEngine = {
   config(input) {
     const c={...input,action:input.action||'like',dry:input.dry!==false};
     if(!['like','follow','unfollow','comment'].includes(c.action))throw Error('Choose an action.');
-    for(const key of ['perUser','limit','delay','maxAge','scanLimit']) {
-      c[key]=Number(c[key]??(key==='scanLimit'?50:0));const min=key==='maxAge'?0:key==='delay'?30:1;const max=key==='scanLimit'?500:key==='delay'?86400:100000;
+    for(const key of ['perUser','limit','delay','maxAge','scanLimit','dailyCap']) {
+      c[key]=Number(c[key]??(key==='scanLimit'?50:0));const min=key==='maxAge'||key==='dailyCap'?0:key==='delay'?30:1;const max=key==='scanLimit'?500:key==='delay'?86400:key==='dailyCap'?10000:100000;
       if(!Number.isInteger(c[key])||c[key]<min||c[key]>max)throw Error(`Check ${key}: enter a whole number from ${min} to ${max}.`);
     }
     if(c.maxAge || c.videos)throw Error('Post age and skip-video filters are unavailable for TikTok.');

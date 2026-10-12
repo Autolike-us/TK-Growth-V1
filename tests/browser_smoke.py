@@ -1,6 +1,6 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-import json
+import json,os
 ROOT=Path(__file__).resolve().parent.parent
 checks=[]
 URL='https://www.tiktok.com/@alice/video/123'
@@ -12,7 +12,8 @@ window.chrome={runtime:{id:'extension',onMessage:{addListener:f=>listeners.push(
 const nativeTimeout=window.setTimeout;window.setTimeout=(f,ms,...args)=>nativeTimeout(f,Math.min(ms,10),...args);
 document.addEventListener('click',e=>{if(e.target.closest('main button'))clicks++});'''
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+ exe=os.environ.get('CHROMIUM_PATH') or next((x for x in ('/usr/bin/chromium','/opt/pw-browsers/chromium') if os.path.exists(x)),None)
+ browser=p.chromium.launch(headless=True,args=['--no-sandbox'],**({'executable_path':exe} if exe else {}))
  context=browser.new_context()
  context.route('**/*',lambda r:r.fulfill(status=200,content_type='text/html',body='<html><body></body></html>'))
  page=context.new_page()
@@ -50,6 +51,12 @@ with sync_playwright() as p:
  fixture(PROFILE,'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Following'}");r=step(action='follow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('follow confirms changed state',r.get('performed') and page.evaluate('clicks')==1)
  fixture(PROFILE.replace('>Follow<','>Following<'),'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Follow'}");r=step(action='unfollow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('explicit unfollow confirms immediate state change',r.get('performed') and page.evaluate('clicks')==1)
  fixture(VIDEO);page.evaluate("document.querySelector('main').insertAdjacentHTML('beforeend','<button data-e2e=\"browse-like-icon\" aria-pressed=\"false\">Like</button>')");r=step(dry=False);check('ambiguous video like controls fail closed',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(VIDEO.replace('<p>Hello','<p>Too many attempts, you are following too fast'));r=step();check('warning words inside a comment do not stop the task',bool(r.get('preview')) and not r.get('error'))
+ fixture(VIDEO.replace('<main>','<main><div role="dialog">Try Again Later</div>'));r=step();check('warning shown in a dialog does stop the task',bool(r.get('error')) and 'verification' in r.get('error',''))
+ fixture(VIDEO);page.add_script_tag(path=str(ROOT/'content.js'));check('content script is safe to inject twice',page.evaluate('listeners.length')==1)
+ fixture(VIDEO);rep=page.evaluate('AuroraDiagnose()');check('page check reports what it found',('Like buttons found: 1' in rep) and ('Video author found: ✓' in rep) and 'Signed in: ✓' in rep)
+ fixture(VIDEO,actor=False);rep=page.evaluate('AuroraDiagnose()');check('page check flags a missing sign-in',('Signed in: ✗' in rep))
+ fixture(VIDEO+'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{"webapp.app-context":{"user":{"uniqueId":"Me_User"}}}}</script>',actor=False);page.evaluate("()=>{const b=document.querySelector('[data-e2e=browse-like-icon]');b.onclick=()=>b.setAttribute('aria-pressed','true')}");r=step(dry=False);check('signed-in user is read from the page data when the menu link is missing',bool(r.get('performed')))
  HM1='<main><a href="/@alice">alice</a><button id="hb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(255, 255, 255, .9)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button><div data-e2e="comment-item"><a href="/@alice">alice</a><button id="cb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(255, 255, 255, .9)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button></div></main>'
  HM2='<main><a href="/@alice">alice</a><button id="hb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(254, 44, 85, 1)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button><div data-e2e="comment-item"><a href="/@alice">alice</a><button id="cb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(254, 44, 85, 1)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button></div></main>'
  fixture(HM1);page.evaluate("()=>{const b=document.getElementById('hb');b.onclick=()=>b.querySelector('svg').setAttribute('fill','rgba(254, 44, 85, 1)')}");r=step(dry=False);check('label-less heart svg: found by shape, white means unliked, comment heart ignored, liked once',bool(r.get('performed')) and page.evaluate('clicks')==1)

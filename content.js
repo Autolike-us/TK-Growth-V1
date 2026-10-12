@@ -1,7 +1,16 @@
 (()=>{
+ if(globalThis.__auroraContent)return;globalThis.__auroraContent=true;
  const D=AuroraDOM,S=AuroraSelectors;let locked=false;
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
- function blocked(){const text=document.body.innerText;if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');if(/Try Again Later|We restrict certain activity|Action Blocked|Confirm it.s you|Help us confirm|challenge required|Too many attempts|You.re following too fast|You.re tapping too fast|Verify to continue|Drag the slider|Verify you are human/i.test(text))throw Error('TikTok requested verification or restricted this action. Task paused.');}
+ const WARN=/Try Again Later|We restrict certain activity|Action Blocked|Confirm it.s you|Help us confirm|challenge required|Too many attempts|You.re following too fast|You.re tapping too fast|Verify to continue|Drag the slider|Verify you are human/i;
+ let lastCheck=0;
+ // Looks only at dialogs, alerts, toasts and captcha widgets (never at comments or captions), at most every 1.5 s.
+ function blocked(force){
+  if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');
+  const now=Date.now();if(!force&&now-lastCheck<1500)return;lastCheck=now;
+  const zones=[...document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="alert"],[class*="Toast" i],[class*="captcha" i],[id*="captcha" i]')].filter(D.visible);
+  if(zones.some(z=>/captcha/i.test((z.id||'')+(z.className||''))||WARN.test(z.innerText||'')))throw Error('TikTok requested verification or restricted this action. Task paused.');
+ }
  async function active(id){blocked();const {job}=await chrome.storage.local.get('job');if(job?.id!==id||job.status!=='running')throw Error('Task stopped or paused.');}
  async function until(fn,id,ms=12000){for(let t=0;t<ms;t+=300){await active(id);const x=fn();if(x)return x;await wait(300);}return null;}
  async function collect(root,read,limit,id){
@@ -106,6 +115,28 @@
   }
   throw Error('Unsupported post action.');
  }
+ // Read-only report used by the on-page "Check page" button. Contains counts and yes/no only, no names or tokens.
+ globalThis.AuroraDiagnose=()=>{
+  const root=D.scope()||document.body,mark=ok=>ok?'✓':'✗';
+  const kind=S.postURL(location.href)?'video':S.profileName(location.href)?'profile':/^\/tag\//.test(location.pathname)?'hashtag':'other';
+  const likes=D.likeCandidates(root).length,lang=(document.documentElement.lang||'').toLowerCase();
+  const rows=[
+   ['Page type',kind],
+   ['Signed in',mark(!!D.actor())],
+   ['English interface',mark(lang.startsWith('en'))+(lang?` (${lang})`:'')],
+   ['Page container found',mark(!!D.scope())],
+   ['Video author found',kind==='video'?mark(!!D.author(root)):'n/a'],
+   ['Like buttons found',kind==='video'?`${likes} ${mark(likes>=1)}`:'n/a'],
+   ['Like state readable',kind==='video'?mark(D.likeState(D.likeButton(root,D.author(root)))!==null):'n/a'],
+   ['Profile name header',kind==='profile'?mark(!!root.querySelector('[data-e2e="user-title"],[data-e2e="user-subtitle"]')):'n/a'],
+   ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
+   ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
+   ['Comment rows',String(D.commentRows(root).length)],
+   ['Followers/following popup',mark(!!D.listDialog('followers')||!!D.listDialog('following'))],
+   ['Captcha/warning visible',(()=>{try{blocked(true);return 'no';}catch(e){return /Sign in/.test(e.message)?'login page':'YES';}})()]
+  ];
+  return 'Aurora page check\n'+rows.map(([k,v])=>`${k}: ${v}`).join('\n');
+ };
  chrome.runtime.onMessage.addListener((m,s,reply)=>{if(m.action!=='step'||s.id!==chrome.runtime.id)return;if(locked){reply({wait:'Waiting for the current step.'});return;}locked=true;step(m.step,m.config,m.jobId).then(reply,e=>reply({error:e.message})).finally(()=>locked=false);return true;});
 })();
 

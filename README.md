@@ -1,4 +1,4 @@
-# Aurora • TikTok Studio 1.0.0
+# Aurora • TikTok Studio 1.1.0
 
 Adapted from the current `main` branch of Autolike-us/IG-Growth-V1 (Aurora 2.0.0). This is a separate TikTok extension; install it in its own folder so Instagram settings and history remain separate. Complete readable source is included. No build or subscription is required.
 
@@ -37,7 +37,22 @@ Preview resets on when the studio opens or the action changes. Errors and detect
 
 Live actions require the extension to identify the signed-in account and target. Unsupported layouts or unreadable controls fail closed. Use English and check a one-target preview first; selectors may need updates for TikTok experiments or changes. Comment receipts acknowledge the rendered interface, not guaranteed final server delivery.
 
-This build was checked with 26 planning/worker tests, isolated Chromium browser fixtures, JavaScript syntax checks, and manifest/dashboard validation. No live account actions were submitted. End-to-end operation as an installed extension on the live TikTok website remains unverified. The isolated browser tests simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+This build is checked by 19 unit tests (`npm test`) and 47 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+
+## Pacing, caps and limits
+
+- The wait between steps is **never shorter than the seconds you set**; Aurora adds a random 0–40% on top so the rhythm is not mechanical.
+- **Daily action cap** (optional, 0 = off): live actions are counted per day across tasks, and the task pauses when the cap is reached.
+- Only **videos** are processed. Photo posts and carousels (`/photo/` links) are skipped; they are not supported yet.
+- History keeps the most recent 5,000 entries (use **Clear history** to empty it). Old like/follow receipts are dropped after 90 days; comment receipts are kept so a comment is never sent twice.
+
+## Page check (when something stops working)
+
+On any TikTok tab open the floating **✦ Aurora** panel and press **Check page**. It lists what Aurora can see on that page (signed in, English interface, like button count, author, profile header, follower popup, any warning) and copies the report to your clipboard. It contains counts and ✓/✗ only: no usernames, links or tokens. Send it with the pause message when asking for help.
+
+## Build a package
+
+`npm run package` writes `dist/aurora-tiktok-studio-<version>.zip` with only the files Chrome needs (no tests). Unzip it and use **Load unpacked**.
 
 ## Data and source
 
