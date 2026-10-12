@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0
+- **Faster start.** The pacing wait now applies after each action, not after reading a profile or skipping a post, so the first action begins about 10 seconds after you press Start instead of waiting a full delay first. The wait between actions is unchanged (never shorter than your setting, plus the random extra).
+
 ## 1.2.2
 - **Fixed: Aurora could pick videos that were not on the target profile** (for example your own video linked from a side panel) and try to act on them. Profile steps now read only the profile's own video grid, and only videos by that profile.
 - **Your own posts are never liked or commented on**; they are skipped with a message.
