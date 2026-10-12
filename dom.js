@@ -1,18 +1,18 @@
 globalThis.AuroraDOM={
  visible:e=>!!e?.getClientRects().length,
- controls(root){return [...root.querySelectorAll('button,[role="button"]')].filter(this.visible);},
+ controls(root){return root?[...root.querySelectorAll('button,[role="button"]')].filter(this.visible):[];},
  text(e){const copy=e.cloneNode(true);copy.querySelectorAll('svg').forEach(x=>x.remove());return copy.textContent.trim();},
  button(root,label){return this.controls(root).find(e=>this.text(e)===label||e.getAttribute('aria-label')===label);},
  scope(){const pick=q=>[...document.querySelectorAll(q)].find(this.visible);return pick('[data-e2e="browse-video-container"],[class*="DivBrowserModeContainer"],main,[role="main"]')||pick('[data-e2e="user-page"],#main-content-others_homepage,[id^="main-content"],[data-e2e="challenge-item-list"],#app')||(document.body&&this.visible(document.body)?document.body:null);},
  profileHeader(root){return root.querySelector('[data-e2e="user-page"]')||root;},
- names(root){return [...new Set([...root.querySelectorAll('a[href]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).filter(Boolean))];},
+ names(root){return !root?[]:[...new Set([...root.querySelectorAll('a[href]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).filter(Boolean))];},
  author(root){const sel='[data-e2e="browse-username"],[data-e2e="video-author-uniqueid"],[data-e2e="browse-user-avatar"],[data-e2e="video-author-avatar"],[data-e2e="video-author-nickname"],[data-e2e="browse-user-name"]';
   for(const e of [...root.querySelectorAll(sel)].filter(this.visible)){
    const link=e.closest('a')||e.querySelector('a');const name=AuroraSelectors.profileName(e.href||link?.href||'')||(/uniqueid|username/.test(e.getAttribute('data-e2e'))&&/^@?[\w.]{1,30}$/.test(e.textContent.trim())?e.textContent.trim().replace(/^@/,''):null);
    if(name)return name.toLowerCase();
   }
   return null;},
- commentRows(root){return [...root.querySelectorAll('[data-e2e="comment-item"],[data-e2e="comment-level-1"]')].filter(this.visible);},
+ commentRows(root){return !root?[]:[...root.querySelectorAll('[data-e2e="comment-item"],[data-e2e="comment-level-1"]')].filter(this.visible);},
  commenters(root){return [...new Set(this.commentRows(root).map(row=>this.names(row)[0]).filter(Boolean))];},
  listDialog(source){
   const known=[...document.querySelectorAll('[role="dialog"],[data-e2e="follow-info-popup"],[class*="DivModalContainer"]')].filter(this.visible).find(e=>new RegExp(`\\b${source}\\b`,'i').test(e.getAttribute('aria-label')||e.textContent||''));

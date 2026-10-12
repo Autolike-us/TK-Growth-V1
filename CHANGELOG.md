@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.3.0
+- **Faster start.** The pacing wait now applies after each action, not after reading a profile or skipping a post, so the first action begins about 10 seconds after you press Start instead of waiting a full delay first. The wait between actions is unchanged (never shorter than your setting, plus the random extra).
+
+## 1.2.2
+- **Fixed: Aurora could pick videos that were not on the target profile** (for example your own video linked from a side panel) and try to act on them. Profile steps now read only the profile's own video grid, and only videos by that profile.
+- **Your own posts are never liked or commented on**; they are skipped with a message.
+- A numeric account id in a video address (TikTok accepts both) no longer fails the author check; the matching video id is the proof.
+
+## 1.2.1
+- **Fixed: a comment could be posted but then reported as unconfirmed** when TikTok replaced the comment box while typing. Aurora now looks the box up fresh each time and confirms against the live page.
+- Page helpers no longer throw when an element disappears mid-step; the debug log now includes the page-side error stack.
+
 ## 1.2.0
 - **Photo posts** (`/photo/` links) are now supported alongside videos. A photo post with no Like control is skipped with a clear message instead of pausing the task.
 - **Debug log**: a rolling activity log with a one-click **Copy report** (studio tab, paused banner and on-page panel). Failed steps record a page trace and the Check page report automatically.

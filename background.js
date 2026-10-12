@@ -19,7 +19,7 @@ function dlog(level,msg,data){
  return logChain;
 }
 const short=u=>String(u||'').split('?')[0];
-const ctx=r=>[r?.trace?.length?'page trace: '+r.trace.join(' | '):'',r?.diag||''].filter(Boolean).join('\n');
+const ctx=r=>[r?.trace?.length?'page trace: '+r.trace.join(' | '):'',r?.stack?'page error stack:\n'+r.stack:'',r?.diag||''].filter(Boolean).join('\n');
 globalThis.addEventListener?.('unhandledrejection',e=>dlog('error','Unhandled error in background',String(e.reason?.stack||e.reason).split('\n').slice(0,5).join('\n')));
 
 // One status notification that is replaced, never stacked.
@@ -35,8 +35,10 @@ chrome.notifications.onButtonClicked.addListener(async(id,index)=>{chrome.notifi
 
 async function log(message,url){const {history=[]}=await chrome.storage.local.get('history');history.push({time:Date.now(),message,url});await chrome.storage.local.set({history:history.slice(-HISTORY_MAX)});}
 async function schedule(job){await chrome.alarms.create('step',{when:Date.now()+Math.max(1000,(job.nextAt||0)-Date.now())});}
-// Wait between steps: never shorter than the user's setting, plus 0-40% random extra so the rhythm is not mechanical.
+// Wait after each counted action (like/follow/comment, or a preview of one): never shorter than the user's setting, plus 0-40% random extra so the rhythm is not mechanical.
 const pause=job=>Math.round(job.config.delay*1000*(1+Math.random()*0.4));
+// Short, natural pause used after reading a profile or skipping a post (nothing was sent), so the first action starts quickly.
+const quick=()=>Math.round((4+Math.random()*5)*1000);
 
 // Optional daily cap on live actions (0 = off).
 const today=()=>new Date().toDateString();
@@ -83,11 +85,12 @@ async function tick(){
   job.retries=0;
   if(r.wait){job.message=r.wait;job.nextAt=Date.now()+3000;await save(job);await schedule(job);return;}
   job.queue.shift();const more=AuroraEngine.expand(job,step,r);job.queue.unshift(...more);
+  let gap=quick();
   if(['users','posts','author'].includes(step.kind))job.message=`Discovered ${more.length} ${step.kind==='posts'?'posts':'profiles'}. ${r.note||''}`;
-  else{if(r.performed||r.preview){job.done=(job.done||0)+1;if(r.performed){job.counts[job.config.action]++;await bumpDaily();}else job.previewed++;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
+  else{if(r.performed||r.preview){gap=pause(job);job.done=(job.done||0)+1;if(r.performed){job.counts[job.config.action]++;await bumpDaily();}else job.previewed++;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
   await log(job.message,step.url);await dlog('info','→ '+job.message,/^Skipped/.test(job.message||'')?ctx(r):undefined);
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
-  job.nextAt=Date.now()+pause(job);await save(job);await schedule(job);
+  job.nextAt=Date.now()+gap;await save(job);await schedule(job);
  }catch(e){const {job}=await chrome.storage.local.get('job');if(job?.status==='running'){job.status='paused';job.message=e.message;await save(job);await chrome.alarms.clear('step');await log(e.message);await dlog('error','Paused: '+e.message,String(e.stack||'').split('\n').slice(0,4).join('\n'));await notify('Aurora paused — needs you',e.message+(NEEDS_HUMAN.test(e.message)?' Open Aurora to review.':' Press Resume to continue.'),{resume:!NEEDS_HUMAN.test(e.message)});}}
  finally{busy=false;}
 }
