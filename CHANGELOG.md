@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0
+- **Captcha handling.** Aurora now notices TikTok captchas (sized captcha widgets, captcha wording on screen outside comments and captions, and captcha dialogs). It pauses, brings the TikTok tab to the front, notifies you and asks you to solve it; once it is solved in that tab, the task continues by itself. Identity checks and "slow down" warnings are reported separately and need a manual Resume.
+- **Human-like typing.** Comments are typed one character at a time with an uneven rhythm and thinking pauses (capped at about 90 seconds); line breaks become spaces; typing is checked before Post is pressed.
+- A human-length pause (about 1–2.5 s) before every action.
+- Fixed: a multi-line comment could not be confirmed as posted.
+
+## 1.3.1
+- **Fixed: comments were skipped as "disabled".** TikTok keeps the comments panel closed until you click the speech-bubble button; Aurora now opens it when it cannot find the comment box, then continues. If comments really are off, it still skips with a clear message.
+- **Fixed: false "verification requested" stops.** A captcha now counts only when it is actually on screen with a real size and content; empty captcha placeholders that the page keeps around no longer stop the task. When a warning does stop a task, the debug log names the element that triggered it.
+- Check page now also reports whether the comment box and the comments button are found.
+
 ## 1.3.0
 - **Faster start.** The pacing wait now applies after each action, not after reading a profile or skipping a post, so the first action begins about 10 seconds after you press Start instead of waiting a full delay first. The wait between actions is unchanged (never shorter than your setting, plus the random extra).
 

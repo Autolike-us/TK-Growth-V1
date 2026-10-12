@@ -4,14 +4,54 @@
  // Short trace of what this step saw; sent back with the result so the background can log it (never includes cookies or tokens).
  let trace=[];const T=(...a)=>{trace.push(a.join(' ').slice(0,160));if(trace.length>40)trace.shift();};
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
- const WARN=/Try Again Later|We restrict certain activity|Action Blocked|Confirm it.s you|Help us confirm|challenge required|Too many attempts|You.re following too fast|You.re tapping too fast|Verify to continue|Drag the slider|Verify you are human/i;
+ // ---- Challenges (captcha, verification, "slow down") --------------------------------------------------
+ const WARN=/Try Again Later|We restrict certain activity|Action Blocked|Too many attempts|You.re following too fast|You.re tapping too fast|challenge required/i;
+ const VERIFY=/Confirm it.s you|Help us confirm|Verify to continue|Verify you are human|Security verification/i;
+ const CAPTCHA_TEXT=/Drag the slider|fit the puzzle|Select \d objects?|same shape|Slide to complete|Rotate the (image|object)|Click on the (shapes|objects)/i;
+ const CAPTCHA_SEL='[class*="captcha" i],[id*="captcha" i],[class*="secsdk" i],[class*="verify-bar" i],[class*="verify_bar" i],[class*="verify-wrap" i],[class*="verify-container" i],[class*="verify_container" i],iframe[src*="captcha" i]';
+ const SKIP_TEXT='[data-e2e*="comment"],[data-e2e*="video-desc"],[data-e2e*="user-bio"],[data-e2e*="user-post"]';
+ const MSG={
+  captcha:'TikTok is showing a captcha. Solve it in the TikTok tab; Aurora continues automatically once it is solved (or press Resume).',
+  verify:'TikTok is asking you to verify it is you. Complete it in the TikTok tab, then press Resume.',
+  warning:'TikTok restricted this action ("slow down" or "try again later"). Wait a while before you press Resume.'
+ };
+ const cls=z=>typeof z.className==='string'?z.className:'';
+ const big=z=>{const r=z.getBoundingClientRect();return r.width>150&&r.height>100;};
+ const desc=z=>z.tagName.toLowerCase()+(z.id?'#'+z.id:'')+(cls(z)?'.'+cls(z).slice(0,60):'')+' "'+String(z.innerText||z.textContent||'').replace(/\s+/g,' ').slice(0,80)+'"';
+ // Looks for a challenge that is really on screen: sized captcha widgets, captcha wording outside comments/captions, and warning dialogs/toasts.
+ function detectChallenge(){
+  for(const z of document.querySelectorAll(CAPTCHA_SEL))if(D.visible(z)&&big(z)&&(z.tagName==='IFRAME'||z.innerText||z.querySelector('iframe,canvas,img')))return {kind:'captcha',where:desc(z)};
+  for(const el of document.querySelectorAll('div,span,p,h1,h2,h3,button')){
+   if(el.childElementCount>2)continue;const t=el.textContent;if(!t||t.length>120||!CAPTCHA_TEXT.test(t))continue;
+   if(D.visible(el)&&!el.closest(SKIP_TEXT))return {kind:'captcha',where:desc(el)};
+  }
+  for(const z of document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="alert"],[class*="Toast" i]')){
+   if(!D.visible(z))continue;const t=z.innerText||'';
+   if(CAPTCHA_TEXT.test(t))return {kind:'captcha',where:desc(z)};
+   if(VERIFY.test(t))return {kind:'verify',where:desc(z)};
+   if(WARN.test(t))return {kind:'warning',where:desc(z)};
+  }
+  return null;
+ }
+ globalThis.AuroraChallenge=()=>{try{return detectChallenge();}catch{return null;}};
  let lastCheck=0;
- // Looks only at dialogs, alerts, toasts and captcha widgets (never at comments or captions), at most every 1.5 s.
+ // Checked at most every 1.5 s so busy pages stay light.
  function blocked(force){
   if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');
   const now=Date.now();if(!force&&now-lastCheck<1500)return;lastCheck=now;
-  const zones=[...document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="alert"],[class*="Toast" i],[class*="captcha" i],[id*="captcha" i]')].filter(D.visible);
-  if(zones.some(z=>/captcha/i.test((z.id||'')+(z.className||''))||WARN.test(z.innerText||'')))throw Error('TikTok requested verification or restricted this action. Task paused.');
+  const c=detectChallenge();
+  if(c){T('challenge',c.kind,c.where);throw Error(MSG[c.kind]);}
+ }
+ // ---- Human-like pacing -------------------------------------------------------------------------------
+ const rand=(a,b)=>a+Math.random()*(b-a);
+ const think=(a,b)=>wait(rand(a,b));
+ // Types one character at a time with a human rhythm: uneven gaps, longer after spaces and punctuation, the odd pause to think.
+ // Very long texts are sped up so typing never takes more than about 90 seconds.
+ async function typeHuman(text,id,put){
+  const chars=[...String(text)];
+  const gaps=chars.map((ch,i)=>{let g=rand(70,190);if(ch===' ')g+=rand(30,150);else if(/[.,!?;:]/.test(ch))g+=rand(120,380);if(Math.random()<0.04)g+=rand(450,1300);if(i===0)g+=rand(250,650);return g;});
+  const total=gaps.reduce((a,b)=>a+b,0),scale=total>90000?90000/total:1;
+  for(let i=0;i<chars.length;i++){if(i%8===0)await active(id);await put(chars[i]);await wait(gaps[i]*scale);}
  }
  async function active(id){blocked();const {job}=await chrome.storage.local.get('job');if(job?.id!==id||job.status!=='running')throw Error('Task stopped or paused.');}
  async function until(fn,id,ms=12000){for(let t=0;t<ms;t+=300){await active(id);const x=fn();if(x)return x;await wait(300);}return null;}
@@ -32,6 +72,7 @@
  async function perform(key,id,click,confirm,message){
   const {receipts={}}=await chrome.storage.local.get('receipts');
   if(receipts[key])return {message:`Skipped: this action was already ${receipts[key].status}. Check TikTok before creating another task.`};
+  await think(900,2600);
   await active(id);await receipt(key,'attempted');await active(id);await click();T('click sent');
   const ok=await until(confirm,id,9000);T('confirmed',!!ok);
   if(!ok)throw Error('Action was sent but could not be confirmed. It will not be automatically repeated. Check TikTok.');
@@ -110,6 +151,7 @@
   if(c.action==='comment'){
    // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
    const live=()=>D.scope()||root,findField=()=>D.commentField(live());
+   if(!findField()){const open=D.commentsButton(live());T('comments button found',!!open);if(open){open.click();T('opened the comments panel');}}
    const field=await until(findField,id);T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
    if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
@@ -117,9 +159,12 @@
    const key=`${actor}:comment:${S.pageKey(location.href)}`;
    const {receipts={}}=await chrome.storage.local.get('receipts');if(receipts[key])return {message:'Skipped: Aurora already attempted a comment on this post. No duplicate sent.'};
    if(D.fieldText(field).trim())throw Error('The comment box already contains text. Clear it manually before resuming.');
-   const ownComment=()=>D.commentRows(live()).some(row=>D.names(row)[0]===actor&&row.textContent.includes(c.comment));
+   const want=c.comment.replace(/\s*[\r\n]+\s*/g,' ').trim();
+   const ownComment=()=>D.commentRows(live()).some(row=>D.names(row)[0]===actor&&row.textContent.includes(want));
    if(ownComment())return {message:'Skipped: your comment is already visible.'};
-   await active(id);D.fillComment(field,c.comment);
+   await active(id);await think(500,1400);
+   await typeHuman(want,id,async ch=>{const f=findField();if(!f)throw Error('The comment box disappeared while typing. Nothing was submitted.');D.typeChar(f,ch);});
+   {const f=findField();T('typed',[...want].length,'characters');if(!f||D.fieldText(f).trim()!==want)throw Error('Typing did not complete as expected. Nothing was submitted.');}
    const submit=await until(()=>D.commentSubmit(live()),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
    if(!submit)throw Error('Comment prepared but Post control is unavailable. Nothing was submitted.');
    return perform(key,id,()=>submit.click(),()=>{const f=findField();return (!f||!D.fieldText(f).trim())&&ownComment();},'Posted your comment.');
@@ -141,10 +186,12 @@
    ['Like state readable',kind==='video'?mark(D.likeState(D.likeButton(root,D.author(root)))!==null):'n/a'],
    ['Profile name header',kind==='profile'?mark(!!root.querySelector('[data-e2e="user-title"],[data-e2e="user-subtitle"]')):'n/a'],
    ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
+   ['Comment box found',kind==='video'?mark(!!D.commentField(root)):'n/a'],
+   ['Comments button found',kind==='video'?mark(!!D.commentsButton(root)):'n/a'],
    ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
    ['Comment rows',String(D.commentRows(root).length)],
    ['Followers/following popup',mark(!!D.listDialog('followers')||!!D.listDialog('following'))],
-   ['Captcha/warning visible',(()=>{try{blocked(true);return 'no';}catch(e){return /Sign in/.test(e.message)?'login page':'YES';}})()]
+   ['Captcha/warning visible',(()=>{if(location.pathname.includes('/login'))return 'login page';const c=detectChallenge();return c?'YES: '+c.kind+' ('+c.where+')':'no';})()]
   ];
   return 'Aurora page check\n'+rows.map(([k,v])=>`${k}: ${v}`).join('\n');
  };
