@@ -1,4 +1,4 @@
-# Aurora • TikTok Studio 1.3.1
+# Aurora • TikTok Studio 1.4.0
 
 Adapted from the current `main` branch of Autolike-us/IG-Growth-V1 (Aurora 2.0.0). This is a separate TikTok extension; install it in its own folder so Instagram settings and history remain separate. Complete readable source is included. No build or subscription is required.
 
@@ -37,7 +37,7 @@ Preview resets on when the studio opens or the action changes. Errors and detect
 
 Live actions require the extension to identify the signed-in account and target. Unsupported layouts or unreadable controls fail closed. Use English and check a one-target preview first; selectors may need updates for TikTok experiments or changes. Comment receipts acknowledge the rendered interface, not guaranteed final server delivery.
 
-This build is checked by 51 unit tests (`npm test`) and 68 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+This build is checked by 54 unit tests (`npm test`) and 76 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
 
 ## Pacing, caps and limits
 
@@ -46,6 +46,14 @@ This build is checked by 51 unit tests (`npm test`) and 68 isolated-Chromium bro
 - **Daily action cap** (optional, 0 = off): live actions are counted per day across tasks, and the task pauses when the cap is reached.
 - **Videos and photo posts** are both processed. Photo layouts can differ from videos: if a photo post has no Like control Aurora skips it with a clear message instead of stopping (use **Check page** if that repeats).
 - History keeps the most recent 5,000 entries (use **Clear history** to empty it). Old like/follow receipts are dropped after 90 days; comment receipts are kept so a comment is never sent twice.
+
+## Captcha and verification
+
+If a captcha appears, Aurora pauses, brings the task tab to the front, shows a desktop notification and waits for you. **Solve the captcha in that tab**: Aurora notices it is gone and continues by itself (you can also press **Resume**). Identity checks ("Confirm it's you") and "slow down / try again later" warnings pause the task too, but those do not continue automatically: handle them, wait a while if asked, then press **Resume**.
+
+## Human-like typing and pace
+
+Comments are typed one character at a time with an uneven rhythm (about 70–190 ms per key, longer after spaces and punctuation, the odd longer pause to "think"). A very long comment is sped up so typing never takes more than about 90 seconds. Line breaks become spaces. Before every action (like, follow, unfollow, post) Aurora also pauses about 1–2.5 seconds, the way a person would before clicking.
 
 ## Debug log (for support)
 

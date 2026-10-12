@@ -4,7 +4,7 @@ let busy=false;
 // Errors raised before any click is sent; safe to retry while TikTok finishes rendering.
 const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|Cannot identify a unique video Like control/;
 // Pauses that need a person (not a one-click Resume).
-const NEEDS_HUMAN=/verification|restricted|Sign in|Daily cap|interrupted|restarted|unknown/i;
+const NEEDS_HUMAN=/captcha|verify|verification|restricted|Sign in|Daily cap|interrupted|restarted|unknown/i;
 const HISTORY_MAX=5000,RECEIPT_MAX_AGE=90*864e5,LOG_MAX=1500;
 const BADGE={running:['ON','#1fae7c'],paused:['!','#f43f5e'],completed:['✓','#7b5cf0']};
 function badge(job){const b=BADGE[job?.status];chrome.action.setBadgeText({text:b?b[0]:''});if(b)chrome.action.setBadgeBackgroundColor({color:b[1]});}
@@ -45,6 +45,8 @@ const today=()=>new Date().toDateString();
 async function dailyCount(){const {daily}=await chrome.storage.local.get('daily');return daily?.day===today()?daily.count:0;}
 async function bumpDaily(){await chrome.storage.local.set({daily:{day:today(),count:(await dailyCount())+1}});}
 
+// Bring the task tab to the front so a captcha can be solved right away.
+async function focusTab(job){try{await chrome.tabs.update(job.tabId,{active:true});const t=await chrome.tabs.get(job.tabId);await chrome.windows.update(t.windowId,{focused:true,drawAttention:true});}catch{}}
 async function finish(job){
  job.status='completed';job.message=`Session complete: ${job.done||0} ${job.config.dry?'previewed':'actions confirmed'}, ${job.skipped||0} skipped.`;
  await save(job);await log(job.message);await dlog('info','Task finished: '+job.message);await chrome.alarms.clear('step');await notify('Aurora finished ✓',job.message);
@@ -91,7 +93,7 @@ async function tick(){
   await log(job.message,step.url);await dlog('info','→ '+job.message,/^Skipped/.test(job.message||'')?ctx(r):undefined);
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
   job.nextAt=Date.now()+gap;await save(job);await schedule(job);
- }catch(e){const {job}=await chrome.storage.local.get('job');if(job?.status==='running'){job.status='paused';job.message=e.message;await save(job);await chrome.alarms.clear('step');await log(e.message);await dlog('error','Paused: '+e.message,String(e.stack||'').split('\n').slice(0,4).join('\n'));await notify('Aurora paused — needs you',e.message+(NEEDS_HUMAN.test(e.message)?' Open Aurora to review.':' Press Resume to continue.'),{resume:!NEEDS_HUMAN.test(e.message)});}}
+ }catch(e){const {job}=await chrome.storage.local.get('job');if(job?.status==='running'){job.status='paused';job.message=e.message;job.waitingCaptcha=/captcha/i.test(e.message);await save(job);await chrome.alarms.clear('step');await log(e.message);if(job.waitingCaptcha)await focusTab(job);await dlog('error','Paused: '+e.message,String(e.stack||'').split('\n').slice(0,4).join('\n'));await notify('Aurora paused — needs you',e.message+(NEEDS_HUMAN.test(e.message)?' Open Aurora to review.':' Press Resume to continue.'),{resume:!NEEDS_HUMAN.test(e.message)});}}
  finally{busy=false;}
 }
 chrome.alarms.onAlarm.addListener(a=>{if(a.name==='step')tick();});
@@ -100,12 +102,12 @@ async function resumeTask(){
  if(job.inFlight)throw Error('Interrupted action: check TikTok manually, then stop this task and create a new task for remaining targets.');
  if(job.version!==2)throw Error('Stop the old-version task and create a new task.');if(job.status!=='paused')throw Error('Only paused tasks can resume.');
  try{await chrome.tabs.get(job.tabId);}catch{job.tabId=(await chrome.tabs.create({url:job.queue[0]?.url||base})).id;}
- job.status='running';job.navigation=null;job.retries=0;job.nextAt=Date.now()+1000;job.message='Resumed.';
+ job.status='running';job.waitingCaptcha=false;job.navigation=null;job.retries=0;job.nextAt=Date.now()+1000;job.message='Resumed.';
  await save(job);await schedule(job);await dlog('info','Resumed');return{ok:true,message:job.message};
 }
 chrome.runtime.onMessage.addListener((m,s,respond)=>{
  const ownPage=[chrome.runtime.getURL('dashboard.html'),chrome.runtime.getURL('popup.html')].includes(s.url?.split(/[?#]/)[0]);
- const panel=s.tab&&s.url?.startsWith(base)&&['openStudio','previewProfile','pause','resume','stop'].includes(m.action);
+ const panel=s.tab&&s.url?.startsWith(base)&&['openStudio','previewProfile','pause','resume','stop','captchaCleared'].includes(m.action);
  if(s.id!==chrome.runtime.id||(!ownPage&&!panel)){respond({ok:false,error:'Dashboard commands only.'});return;}
  (async()=>{
   if(m.action==='openStudio'){await chrome.tabs.create({url:chrome.runtime.getURL('dashboard.html')});return{ok:true};}
@@ -118,6 +120,7 @@ chrome.runtime.onMessage.addListener((m,s,respond)=>{
    const job={version:2,id:crypto.randomUUID(),config,queue,tabId:tab.id,status:'running',counts:{like:0,follow:0,unfollow:0,comment:0},done:0,liked:0,previewed:0,skipped:0,seen:[],seenUsers:[],nextAt:Date.now()+2000,message:`${config.dry?'Preview':'Live'} ${config.action} task started. Waiting for TikTok.`};
    await save(job);await log(job.message);await dlog('info',job.message,{action:config.action,mode:config.mode,target:String(config.target||'').slice(0,200),limit:config.limit,perUser:config.perUser,scanLimit:config.scanLimit,delay:config.delay,dailyCap:config.dailyCap,preview:config.dry,steps:queue.length});await schedule(job);return{ok:true,message:job.message};
   }
+  if(m.action==='captchaCleared'){const {job}=await chrome.storage.local.get('job');if(!job||job.status!=='paused'||!job.waitingCaptcha||s.tab?.id!==job.tabId)return{ok:false};await dlog('info','Captcha solved, continuing');return resumeTask();}
   if(m.action==='resume')return resumeTask();
   const {job}=await chrome.storage.local.get('job');if(!job)throw Error('Create a task first.');
   if(m.action!=='pause'&&m.action!=='stop')throw Error('Unknown action.');
