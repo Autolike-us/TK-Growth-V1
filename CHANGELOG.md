@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+- **Photo posts** (`/photo/` links) are now supported alongside videos. A photo post with no Like control is skipped with a clear message instead of pausing the task.
+- **Debug log**: a rolling activity log with a one-click **Copy report** (studio tab, paused banner and on-page panel). Failed steps record a page trace and the Check page report automatically.
+
 ## 1.1.0
 - Task finishes immediately at the action limit (no extra wait before the "finished" alert).
 - Wait between steps is never shorter than the setting, with a random 0–40% extra.

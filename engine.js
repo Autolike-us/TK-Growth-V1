@@ -21,7 +21,7 @@ globalThis.AuroraEngine = {
   profileStep(name,c){return {kind:['follow','unfollow'].includes(c.action)?'account':'posts',url:`https://www.tiktok.com/@${name}`,username:name};},
   initial(c) {
     const value=String(c.target||'').trim();if(!value)throw Error('Enter a target.');
-    const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video URLs.');return url;};
+    const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video or photo URLs.');return url;};
     switch(c.mode){
       case 'users':return [...new Set(value.split(/[\s,]+/).map(x=>this.profile(x)))].filter(x=>!c.exclude.includes(x)).map(x=>this.profileStep(x,c));
       case 'posts':return [...new Set(value.split(/[\s,]+/).map(post))].map(url=>({kind:c.action==='follow'?'author':'engage',url}));
