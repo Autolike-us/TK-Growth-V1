@@ -33,7 +33,10 @@
   if(S.pageKey(location.href)!==S.pageKey(s.url))throw Error('TikTok changed targets. Nothing was submitted.');
   if(s.kind==='posts'){
    const read=()=>[...root.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean);
-   if(!await until(()=>read().length,id,15000))throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
+   const empty=()=>{if(!s.username)return null;const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':null;};
+   const ready=await until(()=>read().length||empty(),id,15000);
+   if(!ready)throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
+   if(!read().length)return {posts:[],note:`Skipped @${s.username}: ${ready}.`};
    const posts=await collect(root,read,c.mode==='hashtag'?c.scanLimit:c.perUser,id);
    return {posts,note:'Collected available posts within your scan limit.'};
   }
