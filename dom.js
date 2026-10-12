@@ -24,7 +24,7 @@ globalThis.AuroraDOM={
  },
  scrollContainer(root){return [root,...root.querySelectorAll('div,ul')].filter(e=>e.clientHeight>80&&e.scrollHeight>e.clientHeight+40&&/auto|scroll/.test(getComputedStyle(e).overflowY)).sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];},
  actor(){return [...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean)||null;},
- likeCandidates(root){const q='[data-e2e="browse-like-icon"],[data-e2e="like-icon"],button[aria-label^="Like video"],button[aria-label^="Unlike video"],button[aria-label^="Undo like"]';const find=r=>[...new Set([...r.querySelectorAll(q)].filter(this.visible).map(e=>e.closest('button,[role="button"]')||e))];let c=find(root);if(!c.length&&root!==document)c=find(document);return c;},
+ likeCandidates(root){const q='[data-e2e="browse-like-icon"],[data-e2e="like-icon"],[aria-label^="Like video"],[aria-label^="Unlike video"],[aria-label^="Undo like"],[aria-label^="like video" i]';const find=r=>[...new Set([...r.querySelectorAll(q)].filter(this.visible).map(e=>e.closest('button,[role="button"]')||e))];let c=find(root);if(!c.length&&root!==document)c=find(document);return c;},
  inView(e){const r=e.getBoundingClientRect();const cy=r.top+r.height/2,cx=r.left+r.width/2;return cy>0&&cy<innerHeight&&cx>0&&cx<innerWidth;},
  likeButton(root,author){let c=this.likeCandidates(root);if(c.length>1)c=c.filter(e=>this.inView(e));
   if(c.length>1&&author)c=c.filter(e=>{for(let n=e.parentElement,i=0;n&&i<10;n=n.parentElement,i++){const names=this.names(n);if(names.length)return names[0]===author;}return false;});
