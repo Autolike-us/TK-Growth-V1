@@ -6,7 +6,12 @@ globalThis.AuroraDOM={
  scope(){const pick=q=>[...document.querySelectorAll(q)].find(this.visible);return pick('[data-e2e="browse-video-container"],[class*="DivBrowserModeContainer"],main,[role="main"]')||pick('[data-e2e="user-page"],#main-content-others_homepage,[id^="main-content"],[data-e2e="challenge-item-list"],#app')||(document.body&&this.visible(document.body)?document.body:null);},
  profileHeader(root){return root.querySelector('[data-e2e="user-page"]')||root;},
  names(root){return [...new Set([...root.querySelectorAll('a[href]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).filter(Boolean))];},
- author(root){const e=[...root.querySelectorAll('[data-e2e="browse-username"],a[data-e2e="video-author-uniqueid"]')].find(this.visible);return AuroraSelectors.profileName(e?.href||e?.closest('a')?.href||'')?.toLowerCase()||null;},
+ author(root){const sel='[data-e2e="browse-username"],[data-e2e="video-author-uniqueid"],[data-e2e="browse-user-avatar"],[data-e2e="video-author-avatar"],[data-e2e="video-author-nickname"],[data-e2e="browse-user-name"]';
+  for(const e of [...root.querySelectorAll(sel)].filter(this.visible)){
+   const link=e.closest('a')||e.querySelector('a');const name=AuroraSelectors.profileName(e.href||link?.href||'')||(/uniqueid|username/.test(e.getAttribute('data-e2e'))&&/^@?[\w.]{1,30}$/.test(e.textContent.trim())?e.textContent.trim().replace(/^@/,''):null);
+   if(name)return name.toLowerCase();
+  }
+  return null;},
  commentRows(root){return [...root.querySelectorAll('[data-e2e="comment-item"],[data-e2e="comment-level-1"]')].filter(this.visible);},
  commenters(root){return [...new Set(this.commentRows(root).map(row=>this.names(row)[0]).filter(Boolean))];},
  listDialog(source){
@@ -19,8 +24,8 @@ globalThis.AuroraDOM={
  },
  scrollContainer(root){return [root,...root.querySelectorAll('div,ul')].filter(e=>e.clientHeight>80&&e.scrollHeight>e.clientHeight+40&&/auto|scroll/.test(getComputedStyle(e).overflowY)).sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];},
  actor(){return [...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean)||null;},
- likeButton(root){const matches=[...root.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"],button[aria-label="Like video"],button[aria-label="Unlike video"]')].filter(this.visible);if(matches.length!==1)return null;const e=matches[0];return e.closest('button,[role="button"]')||e;},
- likeState(button){if(!button)return null;const pressed=button.getAttribute('aria-pressed');if(pressed==='true')return true;if(pressed==='false')return false;const label=button.getAttribute('aria-label');if(label==='Unlike video')return true;if(label==='Like video')return false;const paints=[...button.querySelectorAll('svg,path')].map(e=>getComputedStyle(e).fill);if(paints.some(p=>/^rgba?\(25[45], 44, 85(?:, 1)?\)$/.test(p)))return true;if(paints.some(p=>/^rgba?\(22, 24, 35(?:, [\d.]+)?\)$/.test(p)))return false;return null;},
+ likeButton(root){const matches=[...new Set([...root.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"],button[aria-label^="Like video"],button[aria-label^="Unlike video"],button[aria-label^="Undo like"]')].filter(this.visible).map(e=>e.closest('button,[role="button"]')||e))];if(matches.length!==1)return null;return matches[0];},
+ likeState(button){if(!button)return null;const pressed=button.getAttribute('aria-pressed');if(pressed==='true')return true;if(pressed==='false')return false;const label=button.getAttribute('aria-label')||'';if(/^(Unlike video|Undo like)/i.test(label))return true;if(/^Like video/i.test(label))return false;const paints=[...button.querySelectorAll('svg,path')].map(e=>getComputedStyle(e).fill);if(paints.some(p=>/^rgba?\(25[45], 44, 85(?:, 1)?\)$/.test(p)))return true;if(paints.some(p=>/^rgba?\(22, 24, 35(?:, [\d.]+)?\)$/.test(p)))return false;return null;},
  commentField(root){return [...root.querySelectorAll('textarea,[contenteditable="true"][data-e2e="comment-input"],[data-e2e="comment-input"] [contenteditable="true"]')].filter(this.visible).find(e=>e.isContentEditable||/comment/i.test(e.placeholder||e.getAttribute('aria-label')||''))||null;},
  fieldText(field){return 'value' in field?field.value:field.textContent;},
  fillComment(field,text){field.focus();if('value' in field){Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(field,text);field.dispatchEvent(new Event('input',{bubbles:true}));}else{if(!document.execCommand('insertText',false,text))throw Error('TikTok comment editor did not accept text. Nothing submitted.');}},

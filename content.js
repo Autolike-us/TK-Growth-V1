@@ -74,8 +74,9 @@
    return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back'),`Unfollowed @${name}.`);
   }
   if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
-  const author=await until(()=>D.author(root),id);
-  if(!author||author!==new URL(s.url).pathname.split('/')[1].slice(1).toLowerCase())throw Error('Cannot verify the video author. Nothing submitted.');
+  const urlAuthor=new URL(s.url).pathname.split('/')[1].slice(1).toLowerCase();
+  const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);
+  if(!author||author!==urlAuthor)throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
   if(c.action==='like'){
    const button=await until(()=>D.likeButton(root),id);if(!button)throw Error('Cannot identify a unique video Like control.');

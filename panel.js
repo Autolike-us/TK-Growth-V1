@@ -6,9 +6,9 @@
   const shadow = host.attachShadow({mode:'closed'});
   shadow.innerHTML = `<style>
     :host{all:initial;font:14px system-ui;color:#302442}*{box-sizing:border-box}
-    button,input{font:inherit}button{cursor:pointer;border:1px solid #dacded;border-radius:12px;background:#fff0f3;color:#7a1631;padding:10px 14px}button:disabled{opacity:.45;cursor:default}
-    #toggle,.primary{background:#fe2c55;color:white;border:0;box-shadow:-3px 3px 0 #25f4ee,0 8px 24px #fe2c5566;font-weight:650}#toggle{border-radius:999px;padding:11px 18px}#toggle.alert{background:#fe2c55;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}#alert{display:none;margin:0 0 12px;padding:10px 12px;border-radius:14px;background:#fff0f3;border:1px solid #f43f5e55;color:#b4153a;font-weight:600}#alert.on{display:block}
-    section{width:min(340px,calc(100vw - 40px));padding:20px;background:linear-gradient(160deg,#ffffff,#fff1f4);border:1px solid #fe2c5533;border-radius:24px;box-shadow:0 12px 50px #22103233;margin-bottom:10px}
+    button,input{font:inherit}button{cursor:pointer;border:1px solid #d9dde0;border-radius:10px;background:#f4f6f7;color:#121218;padding:10px 14px}button:disabled{opacity:.45;cursor:default}
+    #toggle,.primary{background:#121218;color:white;border:0;box-shadow:-3px 3px 0 #25f4ee,3px -3px 0 #fe2c55;font-weight:650;border-radius:10px}#toggle{padding:11px 18px}#toggle.alert{background:#fe2c55;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}#alert{display:none;margin:0 0 12px;padding:10px 12px;border-radius:14px;background:#fff0f3;border:1px solid #f43f5e55;color:#b4153a;font-weight:600}#alert.on{display:block}
+    section{width:min(340px,calc(100vw - 40px));padding:20px;background:#ffffff;border:1px solid #d9dde0;border-radius:16px;box-shadow:0 12px 50px #22103233;margin-bottom:10px}
     [hidden]{display:none}h2{margin:0;font-size:22px}p{line-height:1.5;margin:12px 0}small{color:#685d76}
     input{width:100%;padding:11px;border:1px solid #d8cae8;border-radius:10px;margin:8px 0 12px;background:white;color:#302442}
     .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}#status{font-weight:600}#message{overflow-wrap:anywhere}label{display:block;margin-top:15px}
