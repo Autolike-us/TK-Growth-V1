@@ -1,4 +1,4 @@
-# Aurora • TikTok Studio 1.3.0
+# Aurora • TikTok Studio 1.3.1
 
 Adapted from the current `main` branch of Autolike-us/IG-Growth-V1 (Aurora 2.0.0). This is a separate TikTok extension; install it in its own folder so Instagram settings and history remain separate. Complete readable source is included. No build or subscription is required.
 
@@ -37,7 +37,7 @@ Preview resets on when the studio opens or the action changes. Errors and detect
 
 Live actions require the extension to identify the signed-in account and target. Unsupported layouts or unreadable controls fail closed. Use English and check a one-target preview first; selectors may need updates for TikTok experiments or changes. Comment receipts acknowledge the rendered interface, not guaranteed final server delivery.
 
-This build is checked by 51 unit tests (`npm test`) and 62 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+This build is checked by 51 unit tests (`npm test`) and 68 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
 
 ## Pacing, caps and limits
 

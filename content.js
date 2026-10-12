@@ -11,7 +11,11 @@
   if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');
   const now=Date.now();if(!force&&now-lastCheck<1500)return;lastCheck=now;
   const zones=[...document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="alert"],[class*="Toast" i],[class*="captcha" i],[id*="captcha" i]')].filter(D.visible);
-  if(zones.some(z=>/captcha/i.test((z.id||'')+(z.className||''))||WARN.test(z.innerText||'')))throw Error('TikTok requested verification or restricted this action. Task paused.');
+  // A captcha counts only if it is actually on screen with a real size and content (TikTok keeps empty captcha placeholders in the page).
+  const big=z=>{const r=z.getBoundingClientRect();return r.width>150&&r.height>100;};
+  const cls=z=>typeof z.className==='string'?z.className:'';
+  const hit=zones.find(z=>(/captcha/i.test((z.id||'')+cls(z))&&big(z)&&(z.innerText||z.querySelector('iframe,canvas,img')))||WARN.test(z.innerText||''));
+  if(hit){T('warning zone',hit.tagName.toLowerCase()+(hit.id?'#'+hit.id:'')+(cls(hit)?'.'+cls(hit).slice(0,60):'')+' "'+String(hit.innerText||'').replace(/\s+/g,' ').slice(0,80)+'"');throw Error('TikTok requested verification or restricted this action. Task paused.');}
  }
  async function active(id){blocked();const {job}=await chrome.storage.local.get('job');if(job?.id!==id||job.status!=='running')throw Error('Task stopped or paused.');}
  async function until(fn,id,ms=12000){for(let t=0;t<ms;t+=300){await active(id);const x=fn();if(x)return x;await wait(300);}return null;}
@@ -110,6 +114,7 @@
   if(c.action==='comment'){
    // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
    const live=()=>D.scope()||root,findField=()=>D.commentField(live());
+   if(!findField()){const open=D.commentsButton(live());T('comments button found',!!open);if(open){open.click();T('opened the comments panel');}}
    const field=await until(findField,id);T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
    if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
@@ -141,6 +146,8 @@
    ['Like state readable',kind==='video'?mark(D.likeState(D.likeButton(root,D.author(root)))!==null):'n/a'],
    ['Profile name header',kind==='profile'?mark(!!root.querySelector('[data-e2e="user-title"],[data-e2e="user-subtitle"]')):'n/a'],
    ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
+   ['Comment box found',kind==='video'?mark(!!D.commentField(root)):'n/a'],
+   ['Comments button found',kind==='video'?mark(!!D.commentsButton(root)):'n/a'],
    ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
    ['Comment rows',String(D.commentRows(root).length)],
    ['Followers/following popup',mark(!!D.listDialog('followers')||!!D.listDialog('following'))],
