@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.5.4
+- Comments: TikTok showed "Something went wrong" in the comments panel after the first typed character. Typing now places the caret inside the editor text leaf (not on the outer wrapper), clicks the box first, and switches the side panel from "You may like" to "Comments" when needed.
+
 ## 1.5.3
 - Comments: the comments icon is now chosen as the one nearest the video on screen, pressed with a full pointer/mouse event sequence, and toggled up to 5 times (same icon, like a manual hide then show) when the panel vanishes; trace records the icon state.
 
