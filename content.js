@@ -104,19 +104,21 @@
    return perform(`${actor}:like:${S.pageKey(location.href)}:${id}`,id,()=>button.click(),()=>D.likeState(D.likeButton(root,author))===true,'Liked video.');
   }
   if(c.action==='comment'){
-   const field=await until(()=>D.commentField(root),id);
+   // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
+   const live=()=>D.scope()||root,findField=()=>D.commentField(live());
+   const field=await until(findField,id);T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
    if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
    const key=`${actor}:comment:${S.pageKey(location.href)}`;
    const {receipts={}}=await chrome.storage.local.get('receipts');if(receipts[key])return {message:'Skipped: Aurora already attempted a comment on this post. No duplicate sent.'};
    if(D.fieldText(field).trim())throw Error('The comment box already contains text. Clear it manually before resuming.');
-   const ownComment=()=>D.commentRows(root).some(row=>D.names(row)[0]===actor&&row.textContent.includes(c.comment));
+   const ownComment=()=>D.commentRows(live()).some(row=>D.names(row)[0]===actor&&row.textContent.includes(c.comment));
    if(ownComment())return {message:'Skipped: your comment is already visible.'};
    await active(id);D.fillComment(field,c.comment);
-   const submit=await until(()=>D.commentSubmit(root),id,5000);
+   const submit=await until(()=>D.commentSubmit(live()),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
    if(!submit)throw Error('Comment prepared but Post control is unavailable. Nothing was submitted.');
-   return perform(key,id,()=>submit.click(),()=>!D.fieldText(field).trim()&&ownComment(),'Posted your comment.');
+   return perform(key,id,()=>submit.click(),()=>{const f=findField();return (!f||!D.fieldText(f).trim())&&ownComment();},'Posted your comment.');
   }
   throw Error('Unsupported post action.');
  }
@@ -142,6 +144,6 @@
   ];
   return 'Aurora page check\n'+rows.map(([k,v])=>`${k}: ${v}`).join('\n');
  };
- chrome.runtime.onMessage.addListener((m,s,reply)=>{if(m.action!=='step'||s.id!==chrome.runtime.id)return;if(locked){reply({wait:'Waiting for the current step.'});return;}locked=true;trace=[];const diag=()=>{try{return globalThis.AuroraDiagnose();}catch{return '';}};step(m.step,m.config,m.jobId).then(r=>reply({...r,trace}),e=>reply({error:e.message,trace,diag:diag()})).finally(()=>locked=false);return true;});
+ chrome.runtime.onMessage.addListener((m,s,reply)=>{if(m.action!=='step'||s.id!==chrome.runtime.id)return;if(locked){reply({wait:'Waiting for the current step.'});return;}locked=true;trace=[];const diag=()=>{try{return globalThis.AuroraDiagnose();}catch{return '';}};step(m.step,m.config,m.jobId).then(r=>reply({...r,trace}),e=>reply({error:e.message,trace,diag:diag(),stack:String(e.stack||'').split('\n').slice(0,4).join('\n')})).finally(()=>locked=false);return true;});
 })();
 

@@ -19,7 +19,7 @@ function dlog(level,msg,data){
  return logChain;
 }
 const short=u=>String(u||'').split('?')[0];
-const ctx=r=>[r?.trace?.length?'page trace: '+r.trace.join(' | '):'',r?.diag||''].filter(Boolean).join('\n');
+const ctx=r=>[r?.trace?.length?'page trace: '+r.trace.join(' | '):'',r?.stack?'page error stack:\n'+r.stack:'',r?.diag||''].filter(Boolean).join('\n');
 globalThis.addEventListener?.('unhandledrejection',e=>dlog('error','Unhandled error in background',String(e.reason?.stack||e.reason).split('\n').slice(0,5).join('\n')));
 
 // One status notification that is replaced, never stacked.

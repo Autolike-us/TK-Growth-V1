@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+- **Fixed: a comment could be posted but then reported as unconfirmed** when TikTok replaced the comment box while typing. Aurora now looks the box up fresh each time and confirms against the live page.
+- Page helpers no longer throw when an element disappears mid-step; the debug log now includes the page-side error stack.
+
 ## 1.2.0
 - **Photo posts** (`/photo/` links) are now supported alongside videos. A photo post with no Like control is skipped with a clear message instead of pausing the task.
 - **Debug log**: a rolling activity log with a one-click **Copy report** (studio tab, paused banner and on-page panel). Failed steps record a page trace and the Check page report automatically.
