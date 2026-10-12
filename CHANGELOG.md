@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.1
+- Fix: comment box, Post button and comment rows are now found even when TikTok renders the comments panel outside the main video container ("comment box disappeared while typing").
+
 ## 1.4.0
 - **Captcha handling.** Aurora now notices TikTok captchas (sized captcha widgets, captcha wording on screen outside comments and captions, and captcha dialogs). It pauses, brings the TikTok tab to the front, notifies you and asks you to solve it; once it is solved in that tab, the task continues by itself. Identity checks and "slow down" warnings are reported separately and need a manual Resume.
 - **Human-like typing.** Comments are typed one character at a time with an uneven rhythm and thinking pauses (capped at about 90 seconds); line breaks become spaces; typing is checked before Post is pressed.
