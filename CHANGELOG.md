@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.2
+- Fix: broader comment-box detection (any TikTok comment editor, not only tagged ones), waits for the video page to settle before typing, reopens the comments panel if TikTok closes it.
+
 ## 1.4.1
 - Fix: comment box, Post button and comment rows are now found even when TikTok renders the comments panel outside the main video container ("comment box disappeared while typing").
 
