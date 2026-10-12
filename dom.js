@@ -23,7 +23,12 @@ globalThis.AuroraDOM={
   return null;
  },
  scrollContainer(root){return [root,...root.querySelectorAll('div,ul')].filter(e=>e.clientHeight>80&&e.scrollHeight>e.clientHeight+40&&/auto|scroll/.test(getComputedStyle(e).overflowY)).sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];},
- actor(){return [...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean)||null;},
+ actor(){
+  const fromMenu=[...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean);
+  if(fromMenu)return fromMenu;
+  // Fallback: the signed-in user's name is part of the page's own startup data.
+  try{const el=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');const u=JSON.parse(el?.textContent||'null')?.['__DEFAULT_SCOPE__']?.['webapp.app-context']?.user?.uniqueId;return /^[\w.]{1,30}$/.test(u||'')?u.toLowerCase():null;}catch{return null;}
+ },
  likeCandidates(root){const q='[data-e2e="browse-like-icon"],[data-e2e="like-icon"],[aria-label^="Like video"],[aria-label^="Unlike video"],[aria-label^="Undo like"],[aria-label^="like video" i]';const heart=r=>[...r.querySelectorAll('svg path')].filter(p=>/^M7\.5 2\.25c3 0 4\.5 2/.test(p.getAttribute('d')||'')).map(p=>p.closest('svg'));
   const notComment=e=>!e.closest('[data-e2e*="comment"],[class*="CommentItem"],[class*="DivComment"]');
   const find=r=>[...new Set([...r.querySelectorAll(q),...heart(r)].filter(this.visible).filter(notComment).map(e=>e.closest('button,[role="button"]')||(e.tagName.toLowerCase()==='svg'?e.parentElement:e)))];let c=find(root);if(!c.length&&root!==document)c=find(document);return c;},

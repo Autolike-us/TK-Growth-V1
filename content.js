@@ -1,7 +1,18 @@
 (()=>{
+ if(globalThis.__auroraContent)return;globalThis.__auroraContent=true;
  const D=AuroraDOM,S=AuroraSelectors;let locked=false;
+ // Short trace of what this step saw; sent back with the result so the background can log it (never includes cookies or tokens).
+ let trace=[];const T=(...a)=>{trace.push(a.join(' ').slice(0,160));if(trace.length>40)trace.shift();};
  const wait=ms=>new Promise(r=>setTimeout(r,ms));
- function blocked(){const text=document.body.innerText;if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');if(/Try Again Later|We restrict certain activity|Action Blocked|Confirm it.s you|Help us confirm|challenge required|Too many attempts|You.re following too fast|You.re tapping too fast|Verify to continue|Drag the slider|Verify you are human/i.test(text))throw Error('TikTok requested verification or restricted this action. Task paused.');}
+ const WARN=/Try Again Later|We restrict certain activity|Action Blocked|Confirm it.s you|Help us confirm|challenge required|Too many attempts|You.re following too fast|You.re tapping too fast|Verify to continue|Drag the slider|Verify you are human/i;
+ let lastCheck=0;
+ // Looks only at dialogs, alerts, toasts and captcha widgets (never at comments or captions), at most every 1.5 s.
+ function blocked(force){
+  if(location.pathname.includes('/login')||document.querySelector('input[name="password"]'))throw Error('Sign in to TikTok, then resume.');
+  const now=Date.now();if(!force&&now-lastCheck<1500)return;lastCheck=now;
+  const zones=[...document.querySelectorAll('[role="dialog"],[role="alertdialog"],[role="alert"],[class*="Toast" i],[class*="captcha" i],[id*="captcha" i]')].filter(D.visible);
+  if(zones.some(z=>/captcha/i.test((z.id||'')+(z.className||''))||WARN.test(z.innerText||'')))throw Error('TikTok requested verification or restricted this action. Task paused.');
+ }
  async function active(id){blocked();const {job}=await chrome.storage.local.get('job');if(job?.id!==id||job.status!=='running')throw Error('Task stopped or paused.');}
  async function until(fn,id,ms=12000){for(let t=0;t<ms;t+=300){await active(id);const x=fn();if(x)return x;await wait(300);}return null;}
  async function collect(root,read,limit,id){
@@ -21,22 +32,24 @@
  async function perform(key,id,click,confirm,message){
   const {receipts={}}=await chrome.storage.local.get('receipts');
   if(receipts[key])return {message:`Skipped: this action was already ${receipts[key].status}. Check TikTok before creating another task.`};
-  await active(id);await receipt(key,'attempted');await active(id);await click();
-  const ok=await until(confirm,id,9000);
+  await active(id);await receipt(key,'attempted');await active(id);await click();T('click sent');
+  const ok=await until(confirm,id,9000);T('confirmed',!!ok);
   if(!ok)throw Error('Action was sent but could not be confirmed. It will not be automatically repeated. Check TikTok.');
   await receipt(key,'confirmed');return {performed:true,message};
  }
  async function step(s,c,id){
   await active(id);
   if(!await until(()=>D.scope(),id,15000))throw Error('TikTok did not render this page. Check access and resume.');
-  const root=D.scope();
+  const root=D.scope();T('step',s.kind,c.action||'','container',root.tagName.toLowerCase()+(root.id?'#'+root.id:''));
   if(S.pageKey(location.href)!==S.pageKey(s.url))throw Error('TikTok changed targets. Nothing was submitted.');
   if(s.kind==='posts'){
    const read=()=>[...root.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean);
    const empty=()=>{if(!s.username)return null;const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':null;};
    const ready=await until(()=>read().length||empty(),id,15000);
    if(!ready)throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
+   if(!read().length)T('empty profile:',ready);
    if(!read().length)return {posts:[],note:`Skipped @${s.username}: ${ready}.`};
+   T('post links',read().length);
    const posts=await collect(root,read,c.mode==='hashtag'?c.scanLimit:c.perUser,id);
    return {posts,note:'Collected available posts within your scan limit.'};
   }
@@ -53,7 +66,7 @@
    return {users:await collect(dialog,listed,c.scanLimit,id),note:'Collected available accounts within your scan limit.'};
   }
   if(s.kind==='author'){const author=await until(()=>D.author(root),id);if(!author)throw Error('Cannot identify this post author.');return {users:[author]};}
-  const actor=D.actor();
+  const actor=D.actor();T('signed in',!!actor);
   if(s.kind==='account'){
    const name=S.profileName(location.href)?.toLowerCase();if(name!==s.username)throw Error('Profile changed; refusing to act on a different account.');
    if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};
@@ -78,12 +91,13 @@
   }
   if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
   const urlAuthor=new URL(s.url).pathname.split('/')[1].slice(1).toLowerCase();
-  const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);
+  const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);T('author found',!!author);
   if(!author||author!==urlAuthor)throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
   if(c.action==='like'){
-   const button=await until(()=>D.likeButton(root,author),id);if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}).`);
-   const state=D.likeState(button);if(state===true)return {message:'Skipped: video already liked.'};
+   const button=await until(()=>D.likeButton(root,author),id);if(!button&&/\/photo\//.test(location.pathname))return {message:'Skipped: Like control not found on this photo post (photo layouts can differ). Use Check page if this repeats.'};if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}).`);
+   const state=D.likeState(button);T('like candidates',D.likeCandidates(root).length,'state',state);
+   if(state===true)return {message:'Skipped: video already liked.'};
    if(state!==false)throw Error('Cannot read whether this video is liked. No click sent.');
    if(c.dry)return {preview:true,message:'Preview: eligible video like. No change made.'};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
@@ -106,6 +120,28 @@
   }
   throw Error('Unsupported post action.');
  }
- chrome.runtime.onMessage.addListener((m,s,reply)=>{if(m.action!=='step'||s.id!==chrome.runtime.id)return;if(locked){reply({wait:'Waiting for the current step.'});return;}locked=true;step(m.step,m.config,m.jobId).then(reply,e=>reply({error:e.message})).finally(()=>locked=false);return true;});
+ // Read-only report used by the on-page "Check page" button. Contains counts and yes/no only, no names or tokens.
+ globalThis.AuroraDiagnose=()=>{
+  const root=D.scope()||document.body,mark=ok=>ok?'✓':'✗';
+  const kind=S.postURL(location.href)?'video':S.profileName(location.href)?'profile':/^\/tag\//.test(location.pathname)?'hashtag':'other';
+  const likes=D.likeCandidates(root).length,lang=(document.documentElement.lang||'').toLowerCase();
+  const rows=[
+   ['Page type',kind],
+   ['Signed in',mark(!!D.actor())],
+   ['English interface',mark(lang.startsWith('en'))+(lang?` (${lang})`:'')],
+   ['Page container found',mark(!!D.scope())],
+   ['Video author found',kind==='video'?mark(!!D.author(root)):'n/a'],
+   ['Like buttons found',kind==='video'?`${likes} ${mark(likes>=1)}`:'n/a'],
+   ['Like state readable',kind==='video'?mark(D.likeState(D.likeButton(root,D.author(root)))!==null):'n/a'],
+   ['Profile name header',kind==='profile'?mark(!!root.querySelector('[data-e2e="user-title"],[data-e2e="user-subtitle"]')):'n/a'],
+   ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
+   ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
+   ['Comment rows',String(D.commentRows(root).length)],
+   ['Followers/following popup',mark(!!D.listDialog('followers')||!!D.listDialog('following'))],
+   ['Captcha/warning visible',(()=>{try{blocked(true);return 'no';}catch(e){return /Sign in/.test(e.message)?'login page':'YES';}})()]
+  ];
+  return 'Aurora page check\n'+rows.map(([k,v])=>`${k}: ${v}`).join('\n');
+ };
+ chrome.runtime.onMessage.addListener((m,s,reply)=>{if(m.action!=='step'||s.id!==chrome.runtime.id)return;if(locked){reply({wait:'Waiting for the current step.'});return;}locked=true;trace=[];const diag=()=>{try{return globalThis.AuroraDiagnose();}catch{return '';}};step(m.step,m.config,m.jobId).then(r=>reply({...r,trace}),e=>reply({error:e.message,trace,diag:diag()})).finally(()=>locked=false);return true;});
 })();
 

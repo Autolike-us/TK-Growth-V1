@@ -1,6 +1,6 @@
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-import json
+import json,os
 ROOT=Path(__file__).resolve().parent.parent
 checks=[]
 URL='https://www.tiktok.com/@alice/video/123'
@@ -12,7 +12,8 @@ window.chrome={runtime:{id:'extension',onMessage:{addListener:f=>listeners.push(
 const nativeTimeout=window.setTimeout;window.setTimeout=(f,ms,...args)=>nativeTimeout(f,Math.min(ms,10),...args);
 document.addEventListener('click',e=>{if(e.target.closest('main button'))clicks++});'''
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+ exe=os.environ.get('CHROMIUM_PATH') or next((x for x in ('/usr/bin/chromium','/opt/pw-browsers/chromium') if os.path.exists(x)),None)
+ browser=p.chromium.launch(headless=True,args=['--no-sandbox'],**({'executable_path':exe} if exe else {}))
  context=browser.new_context()
  context.route('**/*',lambda r:r.fulfill(status=200,content_type='text/html',body='<html><body></body></html>'))
  page=context.new_page()
@@ -50,6 +51,17 @@ with sync_playwright() as p:
  fixture(PROFILE,'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Following'}");r=step(action='follow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('follow confirms changed state',r.get('performed') and page.evaluate('clicks')==1)
  fixture(PROFILE.replace('>Follow<','>Following<'),'https://www.tiktok.com/@alice');page.evaluate("()=>{document.querySelector('#follow').onclick=e=>e.currentTarget.textContent='Follow'}");r=step(action='unfollow',dry=False,kind='account',url='https://www.tiktok.com/@alice',mode='users');check('explicit unfollow confirms immediate state change',r.get('performed') and page.evaluate('clicks')==1)
  fixture(VIDEO);page.evaluate("document.querySelector('main').insertAdjacentHTML('beforeend','<button data-e2e=\"browse-like-icon\" aria-pressed=\"false\">Like</button>')");r=step(dry=False);check('ambiguous video like controls fail closed',bool(r.get('error')) and page.evaluate('clicks')==0)
+ fixture(VIDEO);r=step();check('step results carry a short page trace',isinstance(r.get('trace'),list) and any('like candidates' in t for t in r['trace']))
+ fixture('<main></main>');r=step();check('a failed step carries the page check report',bool(r.get('error')) and 'Aurora page check' in r.get('diag','') and isinstance(r.get('trace'),list))
+ fixture(VIDEO,'https://www.tiktok.com/@alice/photo/123');r=step(url='https://www.tiktok.com/@alice/photo/123');check('photo posts can be previewed like videos',bool(r.get('preview')) and not r.get('error'))
+ fixture(VIDEO.replace('browse-like-icon','x').replace('Like</button>','Share</button>'),'https://www.tiktok.com/@alice/photo/123');r=step(url='https://www.tiktok.com/@alice/photo/123');check('photo post without a Like control is skipped, not an error',not r.get('error') and 'photo post' in r.get('message',''))
+ fixture(VIDEO.replace('browse-like-icon','x').replace('Like</button>','Share</button>'));r=step();check('video without a Like control still fails closed',bool(r.get('error')))
+ fixture(VIDEO.replace('<p>Hello','<p>Too many attempts, you are following too fast'));r=step();check('warning words inside a comment do not stop the task',bool(r.get('preview')) and not r.get('error'))
+ fixture(VIDEO.replace('<main>','<main><div role="dialog">Try Again Later</div>'));r=step();check('warning shown in a dialog does stop the task',bool(r.get('error')) and 'verification' in r.get('error',''))
+ fixture(VIDEO);page.add_script_tag(path=str(ROOT/'content.js'));check('content script is safe to inject twice',page.evaluate('listeners.length')==1)
+ fixture(VIDEO);rep=page.evaluate('AuroraDiagnose()');check('page check reports what it found',('Like buttons found: 1' in rep) and ('Video author found: ✓' in rep) and 'Signed in: ✓' in rep)
+ fixture(VIDEO,actor=False);rep=page.evaluate('AuroraDiagnose()');check('page check flags a missing sign-in',('Signed in: ✗' in rep))
+ fixture(VIDEO+'<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">{"__DEFAULT_SCOPE__":{"webapp.app-context":{"user":{"uniqueId":"Me_User"}}}}</script>',actor=False);page.evaluate("()=>{const b=document.querySelector('[data-e2e=browse-like-icon]');b.onclick=()=>b.setAttribute('aria-pressed','true')}");r=step(dry=False);check('signed-in user is read from the page data when the menu link is missing',bool(r.get('performed')))
  HM1='<main><a href="/@alice">alice</a><button id="hb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(255, 255, 255, .9)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button><div data-e2e="comment-item"><a href="/@alice">alice</a><button id="cb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(255, 255, 255, .9)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button></div></main>'
  HM2='<main><a href="/@alice">alice</a><button id="hb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(254, 44, 85, 1)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button><div data-e2e="comment-item"><a href="/@alice">alice</a><button id="cb"><svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\" fill=\"rgba(254, 44, 85, 1)\" width=\"20\" height=\"20\"><g><path d=\"M7.5 2.25c3 0 4.5 2 4.5 2s1.5-2 4.5-2c3.5 0 6 2.75 6 6.25 0 4-3.269 7.566-6.25 10.25C14.41 20.407 13 21.5 12 21.5s-2.45-1.101-4.25-2.75C4.82 16.066 1.5 12.5 1.5 8.5c0-3.5 2.5-6.25 6-6.25\"></path></g></svg></button></div></main>'
  fixture(HM1);page.evaluate("()=>{const b=document.getElementById('hb');b.onclick=()=>b.querySelector('svg').setAttribute('fill','rgba(254, 44, 85, 1)')}");r=step(dry=False);check('label-less heart svg: found by shape, white means unliked, comment heart ignored, liked once',bool(r.get('performed')) and page.evaluate('clicks')==1)
@@ -66,10 +78,11 @@ with sync_playwright() as p:
  fixture(V2.replace('href="/@alice"><span>alice','href="/@bob"><span>bob'));r=step();check('author mismatch still fails closed',bool(r.get('error')) and page.evaluate('clicks')==0)
  fixture(V2.replace('aria-pressed="false"','aria-pressed="true"').replace('Like video','Unlike video'));r=step();check('direct video page layout: already liked is skipped',not r.get('preview') and not r.get('error') and 'already liked' in r.get('message',''))
  for f in ['dashboard.html','popup.html']:
-  page.goto('https://fixture.test/'+f);page.set_content((ROOT/f).read_text());page.add_script_tag(content=MOCK);page.evaluate('data.job=null');page.add_style_tag(path=str(ROOT/'style.css'));page.add_script_tag(path=str(ROOT/'dashboard.js'));page.wait_for_timeout(100)
+  page.goto('https://fixture.test/'+f);page.set_content((ROOT/f).read_text());page.add_script_tag(content=MOCK);page.evaluate('data.job=null');page.add_style_tag(path=str(ROOT/'style.css'));page.add_script_tag(path=str(ROOT/'report.js'));page.add_script_tag(path=str(ROOT/'dashboard.js'));page.wait_for_timeout(100)
   check(f+' preview defaults on',page.locator('#dry').is_checked() and 'Extension error' not in page.locator('#notice').inner_text())
   check(f+' only supported discovery sources',set(page.locator('#mode option').evaluate_all('(es)=>es.map(e=>e.value)'))=={'users','followers','following','commenters','hashtag','posts'})
   page.select_option('#action','unfollow');check(f+' unfollow restricts discovery',page.locator('#mode').input_value()=='users' and page.locator('#mode option:not([value=users])').evaluate_all('(es)=>es.every(e=>e.disabled)'))
+  page.evaluate("chrome.runtime.getManifest=()=>({name:'T',version:'1'})");page.click('#debugTab');page.wait_for_timeout(300);check(f+' debug log tab shows the report',page.locator('#debug').is_visible() and not page.locator('#studio').is_visible() and 'Aurora debug report' in page.locator('#debugText').inner_text());page.click('#studioTab');check(f+' can switch back to the studio',page.locator('#studio').is_visible())
   page.screenshot(path=str(ROOT.parent/(f.replace('.html','')+'-tiktok.png')),full_page=True)
  browser.close()
 print(json.dumps({'passed':len(checks),'checks':checks},indent=2))

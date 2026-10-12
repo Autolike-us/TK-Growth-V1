@@ -9,15 +9,15 @@
     button,input{font:inherit}button{cursor:pointer;border:1px solid #d9dde0;border-radius:10px;background:#f4f6f7;color:#121218;padding:10px 14px}button:disabled{opacity:.45;cursor:default}
     #toggle,.primary{background:#121218;color:white;border:0;box-shadow:-3px 3px 0 #25f4ee,3px -3px 0 #fe2c55;font-weight:650;border-radius:10px}#toggle{padding:11px 18px}#toggle.alert{background:#fe2c55;animation:ring 1.2s ease-in-out infinite}@keyframes ring{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}#alert{display:none;margin:0 0 12px;padding:10px 12px;border-radius:14px;background:#fff0f3;border:1px solid #f43f5e55;color:#b4153a;font-weight:600}#alert.on{display:block}
     section{width:min(340px,calc(100vw - 40px));padding:20px;background:#ffffff;border:1px solid #d9dde0;border-radius:16px;box-shadow:0 12px 50px #22103233;margin-bottom:10px}
-    [hidden]{display:none}h2{margin:0;font-size:22px}p{line-height:1.5;margin:12px 0}small{color:#685d76}
+    [hidden]{display:none}pre{white-space:pre-wrap;font:12px/1.5 ui-monospace,Consolas,monospace;background:#f4f6f7;border:1px solid #d9dde0;border-radius:10px;padding:10px;margin:10px 0 0;color:#121218}h2{margin:0;font-size:22px}p{line-height:1.5;margin:12px 0}small{color:#685d76}
     input{width:100%;padding:11px;border:1px solid #d8cae8;border-radius:10px;margin:8px 0 12px;background:white;color:#302442}
     .row{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}#status{font-weight:600}#message{overflow-wrap:anywhere}label{display:block;margin-top:15px}
-  </style><section hidden><h2>✦ Aurora <small>1.0.0</small></h2><div id="alert" role="alert">🔔 Paused — needs you. Check the message, then press Resume.</div>
+  </style><section hidden><h2>✦ Aurora <small>1.2.0</small></h2><div id="alert" role="alert">🔔 Paused — needs you. Check the message, then press Resume.</div>
     <p id="status">Ready</p><p id="message" role="status" aria-live="polite">Preview a profile to check discovery without sending likes.</p>
     <label for="target">Profile username</label><input id="target" placeholder="@username">
     <button id="preview" class="primary">Preview profile</button>
     <div class="row"><button id="pause">Pause</button><button id="resume">Resume</button><button id="stop">Stop</button></div>
-    <p><small>Preview checks up to 3 posts. Allow 30 seconds between steps.</small></p><button id="studio">Open full studio</button>
+    <p><small>Preview checks up to 3 posts. Allow 30 seconds between steps.</small></p><div class="row"><button id="studio">Open full studio</button><button id="check">Check page</button></div><div class="row"><button id="copyReport">Copy error report</button></div><pre id="report" hidden></pre>
   </section><button id="toggle" aria-expanded="false">✦ Aurora</button>`;
   document.documentElement.append(host);
   const $ = id => shadow.getElementById(id);
@@ -30,6 +30,8 @@
   }
   $('preview').onclick=()=>send('previewProfile',{target:$('target').value});
   $('studio').onclick=()=>send('openStudio');
+  $('copyReport').onclick=async()=>{try{const t=await globalThis.AuroraReport.build(80);await navigator.clipboard.writeText(t);$('message').textContent='Error report copied. Paste it into your message.';}catch(e){$('message').textContent='Could not copy the report: '+e.message;}};
+  $('check').onclick=async()=>{const r=$('report');try{const text=globalThis.AuroraDiagnose?globalThis.AuroraDiagnose():'Check unavailable on this page.';r.textContent=text;r.hidden=false;try{await navigator.clipboard.writeText(text);$('message').textContent='Page check copied to your clipboard.';}catch{$('message').textContent='Page check shown below.';}}catch(e){r.textContent='Check failed: '+e.message;r.hidden=false;}};
   for(const action of ['pause','resume','stop'])$(action).onclick=()=>send(action);
   let wasPaused=false;
   function render(job){

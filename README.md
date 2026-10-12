@@ -1,4 +1,4 @@
-# Aurora • TikTok Studio 1.0.0
+# Aurora • TikTok Studio 1.2.0
 
 Adapted from the current `main` branch of Autolike-us/IG-Growth-V1 (Aurora 2.0.0). This is a separate TikTok extension; install it in its own folder so Instagram settings and history remain separate. Complete readable source is included. No build or subscription is required.
 
@@ -18,7 +18,7 @@ Adapted from the current `main` branch of Autolike-us/IG-Growth-V1 (Aurora 2.0.0
 - **Unfollow**: only the explicit profile list you enter. Other discovery sources are disabled. Handles a direct state change or an Unfollow confirmation dialog.
 - **Comment**: posts your exact text, up to 150 characters. Existing drafts are preserved. A persistent receipt prevents repeated comment attempts on the same video per signed-in account, including uncertain attempts.
 - **Profiles**: usernames, @usernames, or full `https://www.tiktok.com/@username` links, separated by commas/whitespace.
-- **Direct video links**: full `https://www.tiktok.com/@username/video/123456789` URLs. Short share links are not accepted; open them in TikTok and copy the full video address.
+- **Direct post links**: full `https://www.tiktok.com/@username/video/123456789` or `.../photo/123456789` URLs. Short share links are not accepted; open them in TikTok and copy the full video address.
 - **Hashtag**: `#travel`, `travel`, or `https://www.tiktok.com/tag/travel`.
 - **Followers/following**: one profile; reads an available rendered list. TikTok may hide or restrict these lists.
 - **Commenters**: one full video URL; collects authors of visible comment rows.
@@ -37,7 +37,29 @@ Preview resets on when the studio opens or the action changes. Errors and detect
 
 Live actions require the extension to identify the signed-in account and target. Unsupported layouts or unreadable controls fail closed. Use English and check a one-target preview first; selectors may need updates for TikTok experiments or changes. Comment receipts acknowledge the rendered interface, not guaranteed final server delivery.
 
-This build was checked with 26 planning/worker tests, isolated Chromium browser fixtures, JavaScript syntax checks, and manifest/dashboard validation. No live account actions were submitted. End-to-end operation as an installed extension on the live TikTok website remains unverified. The isolated browser tests simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+This build is checked by 47 unit tests (`npm test`) and 56 isolated-Chromium browser fixtures (`npm run test:browser`, set `CHROMIUM_PATH` if Chromium is not found), and the same checks run on GitHub for every push. No live account actions were submitted by the tests. End-to-end operation as an installed extension on the live TikTok website remains your own check: start with Preview and a limit of 1. The browser fixtures simulate TikTok layouts and Chrome extension APIs; they do not prove compatibility with every live layout.
+
+## Pacing, caps and limits
+
+- The wait between steps is **never shorter than the seconds you set**; Aurora adds a random 0–40% on top so the rhythm is not mechanical.
+- **Daily action cap** (optional, 0 = off): live actions are counted per day across tasks, and the task pauses when the cap is reached.
+- **Videos and photo posts** are both processed. Photo layouts can differ from videos: if a photo post has no Like control Aurora skips it with a clear message instead of stopping (use **Check page** if that repeats).
+- History keeps the most recent 5,000 entries (use **Clear history** to empty it). Old like/follow receipts are dropped after 90 days; comment receipts are kept so a comment is never sent twice.
+
+## Debug log (for support)
+
+Open the studio and choose **Debug log**. Aurora keeps a rolling record (last 1,500 events) of what it did: task start, each step, retries, skips, pauses and errors. When a step fails it also records what the page looked like at that moment (the **Check page** report plus a short trace).
+
+- **Copy report** puts a ready-to-paste report on your clipboard (also available as **Copy error report** on the paused banner and in the on-page panel). **Download .txt** saves it; **Clear** empties it.
+- The report contains the extension version, browser, task settings and the log. It does **not** contain passwords, cookies, tokens or your own account name. It does contain the profile/post addresses you targeted and your comment text if you ran a comment task.
+
+## Page check (when something stops working)
+
+On any TikTok tab open the floating **✦ Aurora** panel and press **Check page**. It lists what Aurora can see on that page (signed in, English interface, like button count, author, profile header, follower popup, any warning) and copies the report to your clipboard. It contains counts and ✓/✗ only: no usernames, links or tokens. Send it with the pause message when asking for help.
+
+## Build a package
+
+`npm run package` writes `dist/aurora-tiktok-studio-<version>.zip` with only the files Chrome needs (no tests). Unzip it and use **Load unpacked**.
 
 ## Data and source
 

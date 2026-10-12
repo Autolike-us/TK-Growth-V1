@@ -8,8 +8,8 @@ globalThis.AuroraEngine = {
   config(input) {
     const c={...input,action:input.action||'like',dry:input.dry!==false};
     if(!['like','follow','unfollow','comment'].includes(c.action))throw Error('Choose an action.');
-    for(const key of ['perUser','limit','delay','maxAge','scanLimit']) {
-      c[key]=Number(c[key]??(key==='scanLimit'?50:0));const min=key==='maxAge'?0:key==='delay'?30:1;const max=key==='scanLimit'?500:key==='delay'?86400:100000;
+    for(const key of ['perUser','limit','delay','maxAge','scanLimit','dailyCap']) {
+      c[key]=Number(c[key]??(key==='scanLimit'?50:0));const min=key==='maxAge'||key==='dailyCap'?0:key==='delay'?30:1;const max=key==='scanLimit'?500:key==='delay'?86400:key==='dailyCap'?10000:100000;
       if(!Number.isInteger(c[key])||c[key]<min||c[key]>max)throw Error(`Check ${key}: enter a whole number from ${min} to ${max}.`);
     }
     if(c.maxAge || c.videos)throw Error('Post age and skip-video filters are unavailable for TikTok.');
@@ -21,7 +21,7 @@ globalThis.AuroraEngine = {
   profileStep(name,c){return {kind:['follow','unfollow'].includes(c.action)?'account':'posts',url:`https://www.tiktok.com/@${name}`,username:name};},
   initial(c) {
     const value=String(c.target||'').trim();if(!value)throw Error('Enter a target.');
-    const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video URLs.');return url;};
+    const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video or photo URLs.');return url;};
     switch(c.mode){
       case 'users':return [...new Set(value.split(/[\s,]+/).map(x=>this.profile(x)))].filter(x=>!c.exclude.includes(x)).map(x=>this.profileStep(x,c));
       case 'posts':return [...new Set(value.split(/[\s,]+/).map(post))].map(url=>({kind:c.action==='follow'?'author':'engage',url}));
