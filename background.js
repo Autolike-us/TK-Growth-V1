@@ -1,6 +1,8 @@
 importScripts('selectors.js','engine.js');
 const base='https://www.tiktok.com/';
 let busy=false;
+// Errors raised before any click is sent; safe to retry while TikTok finishes rendering.
+const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|Cannot identify a unique video Like control/;
 const save=job=>chrome.storage.local.set({job});
 async function log(message,url){const {history=[]}=await chrome.storage.local.get('history');history.push({time:Date.now(),message,url});await chrome.storage.local.set({history});}
 async function schedule(job){await chrome.alarms.create('step',{when:Date.now()+Math.max(1000,(job.nextAt||0)-Date.now())});}
@@ -22,7 +24,9 @@ async function tick(){
   let r;try{r=await chrome.tabs.sendMessage(job.tabId,{action:'step',step,config:job.config,jobId:job.id});}catch{throw Error('TikTok content script is unavailable. Refresh the task tab and resume.');}
   const latest=(await chrome.storage.local.get('job')).job;if(latest?.id!==job.id||latest.status!=='running')return;
   job.inFlight=false;await save(job);
+  if(r?.error&&RETRYABLE.test(r.error)&&(job.retries||0)<3){job.retries=(job.retries||0)+1;job.message=`TikTok was still loading (${r.error}) Retrying ${job.retries}/3…`;job.nextAt=Date.now()+8000;await save(job);await schedule(job);return;}
   if(r?.error)throw Error(r.error);if(!r)throw Error('TikTok returned no result.');
+  job.retries=0;
   if(r.wait){job.message=r.wait;job.nextAt=Date.now()+3000;await save(job);await schedule(job);return;}
   job.queue.shift();const more=AuroraEngine.expand(job,step,r);job.queue.unshift(...more);
   if(['users','posts','author'].includes(step.kind))job.message=`Discovered ${more.length} ${step.kind==='posts'?'posts':'profiles'}. ${r.note||''}`;
