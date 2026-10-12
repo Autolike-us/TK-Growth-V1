@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+- Starting a task now reuses the TikTok tab you already have open instead of opening a new one.
+- Comments: waits for TikTok to show its own comment panel before clicking the (toggle) comments icon, retries the icon, and records what the page rendered if the box is lost.
+
 ## 1.5.0
 - New: the form is remembered when the popup closes, a Reset to defaults button, and named saved setups (save, load, rename, delete).
 

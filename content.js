@@ -151,8 +151,14 @@
   if(c.action==='comment'){
    // The page can replace the comment box while typing, so always look it up fresh instead of holding on to one element.
    const live=()=>D.scope()||root;let lastField=null;const findField=()=>{const f=D.commentField(live())||D.commentField(document)||(lastField&&lastField.isConnected&&D.visible(lastField)?lastField:null);if(f)lastField=f;return f;};
-   if(!findField()){const open=D.commentsButton(live());T('comments button found',!!open);if(open){open.click();T('opened the comments panel');}}
-   const field=await until(findField,id);T('comment box found',!!field);
+   // Describes the comment-related parts of the page so a failed run shows what TikTok actually rendered.
+   const probe=()=>{const v=[...document.querySelectorAll('[data-e2e*="comment"]')].slice(0,14).map(e=>(e.getAttribute('data-e2e')||'')+(D.visible(e)?'+':'-')+(e.isContentEditable?'E':'')).join(' ');const ed=[...document.querySelectorAll('textarea,[contenteditable="true"],[role="textbox"]')].map(e=>e.tagName.toLowerCase()+(D.visible(e)?'+':'-')).join(' ');return `e2e[${v}] editors[${ed}] fieldNow=${!!findField()}`;};
+   // TikTok shows the comment panel by itself once the page has loaded, so give it time before clicking the (toggle) comments icon.
+   {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}
+    for(let k=0;k<10&&!findField();k++){await active(id);await wait(400);}}
+   if(!findField()){for(let tries=0;tries<2&&!findField();tries++){const open=D.commentsButton(live());T('comments button found',!!open);if(!open)break;open.click();T('clicked the comments icon, attempt',tries+1);await until(findField,id,6000);}}
+   T('comment dom',probe());
+   const field=findField();T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
    if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
@@ -166,9 +172,9 @@
    // Let the video page finish loading and re-rendering before typing; TikTok can close or rebuild the comment panel while it hydrates.
    {const t0=Date.now();while(document.readyState!=='complete'&&Date.now()-t0<15000){await active(id);await wait(300);}await think(1500,2800);
     let prev=findField(),still=0;while(still<4&&Date.now()-t0<25000){await active(id);await wait(400);const cur=findField();if(cur&&cur===prev)still++;else{still=0;prev=cur;}}
-    if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open);if(open){open.click();await until(findField,id);}}}
+    if(!findField()){await wait(2000);if(!findField()){const open=D.commentsButton(live());T('panel closed while loading; reopening',!!open,probe());if(open){open.click();await until(findField,id,6000);}}}}
    let reopened=false;
-   await typeHuman(want,id,async ch=>{let f=findField();for(let k=0;!f&&k<8;k++){await wait(300);f=findField();}if(!f&&!reopened){reopened=true;const open=D.commentsButton(live());T('comment box lost while typing; reopening',!!open);if(open){open.click();f=await until(findField,id,4000);}}if(!f)throw Error('The comment box disappeared while typing. Nothing was submitted.');D.typeChar(f,ch);});
+   await typeHuman(want,id,async ch=>{let f=findField();for(let k=0;!f&&k<8;k++){await wait(300);f=findField();}if(!f&&!reopened){reopened=true;const open=D.commentsButton(live());T('comment box lost while typing; reopening',!!open,probe());if(open){open.click();f=await until(findField,id,4000);}}if(!f){T('comment box gone',probe());throw Error('The comment box disappeared while typing. Nothing was submitted.');}D.typeChar(f,ch);});
    {const f=findField();T('typed',[...want].length,'characters');if(!f||D.fieldText(f).trim()!==want)throw Error('Typing did not complete as expected. Nothing was submitted.');}
    const submit=await until(()=>D.commentSubmit(live())||D.commentSubmit(document),id,5000);T('post button found',!!submit,'box still attached',field.isConnected);
    if(!submit)throw Error('Comment prepared but Post control is unavailable. Nothing was submitted.');
