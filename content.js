@@ -45,8 +45,9 @@
    let dialog=D.listDialog(s.source);
    if(!dialog){const button=await until(()=>S.listControl(root,s.source),id);if(!button)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);button.click();dialog=await until(()=>D.listDialog(s.source),id);}
    if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
-   if(!await until(()=>D.names(dialog).length,id))throw Error('The list is empty or TikTok did not expose accounts.');
-   return {users:await collect(dialog,()=>D.names(dialog),c.scanLimit,id),note:'Collected available accounts within your scan limit.'};
+   const own=S.profileName(location.href)?.toLowerCase(),listed=()=>D.names(dialog).filter(n=>n!==own);
+   if(!await until(()=>listed().length,id))throw Error('The list is empty or TikTok did not expose accounts.');
+   return {users:await collect(dialog,listed,c.scanLimit,id),note:'Collected available accounts within your scan limit.'};
   }
   if(s.kind==='author'){const author=await until(()=>D.author(root),id);if(!author)throw Error('Cannot identify this post author.');return {users:[author]};}
   const actor=D.actor();

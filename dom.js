@@ -9,7 +9,14 @@ globalThis.AuroraDOM={
  author(root){const e=[...root.querySelectorAll('[data-e2e="browse-username"],a[data-e2e="video-author-uniqueid"]')].find(this.visible);return AuroraSelectors.profileName(e?.href||e?.closest('a')?.href||'')?.toLowerCase()||null;},
  commentRows(root){return [...root.querySelectorAll('[data-e2e="comment-item"],[data-e2e="comment-level-1"]')].filter(this.visible);},
  commenters(root){return [...new Set(this.commentRows(root).map(row=>this.names(row)[0]).filter(Boolean))];},
- listDialog(source){return [...document.querySelectorAll('[role="dialog"],[data-e2e="follow-info-popup"],[class*="DivModalContainer"]')].filter(this.visible).find(e=>new RegExp(`\\b${source}\\b`,'i').test(e.getAttribute('aria-label')||e.textContent||''))||null;},
+ listDialog(source){
+  const known=[...document.querySelectorAll('[role="dialog"],[data-e2e="follow-info-popup"],[class*="DivModalContainer"]')].filter(this.visible).find(e=>new RegExp(`\\b${source}\\b`,'i').test(e.getAttribute('aria-label')||e.textContent||''));
+  if(known)return known;
+  const tabRe=new RegExp(`^${source}\\s*[\\d.,]+\\s*[KMB]?$`,'i');
+  const tabs=[...document.querySelectorAll('[role="tab"],div,span,a,button,p,h2,h3')].filter(e=>this.visible(e)&&tabRe.test(e.textContent.trim()));
+  for(const tab of tabs){for(let n=tab.parentElement;n&&n!==document.body&&n!==document.documentElement;n=n.parentElement){if(n.querySelector('[data-e2e="user-page"],[data-e2e="user-title"],nav'))break;if(this.names(n).length>=2)return n;}}
+  return null;
+ },
  scrollContainer(root){return [root,...root.querySelectorAll('div,ul')].filter(e=>e.clientHeight>80&&e.scrollHeight>e.clientHeight+40&&/auto|scroll/.test(getComputedStyle(e).overflowY)).sort((a,b)=>b.scrollHeight-a.scrollHeight)[0];},
  actor(){return [...document.querySelectorAll('a[data-e2e="profile-icon"],a[data-e2e="nav-profile"],a[aria-label="Profile"]')].filter(this.visible).map(a=>AuroraSelectors.profileName(a.href)?.toLowerCase()).find(Boolean)||null;},
  likeButton(root){const matches=[...root.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"],button[aria-label="Like video"],button[aria-label="Unlike video"]')].filter(this.visible);if(matches.length!==1)return null;const e=matches[0];return e.closest('button,[role="button"]')||e;},
