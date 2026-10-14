@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.6.0
+- Studio refresh (interface only; automation unchanged): always-visible PREVIEW/LIVE bar (LIVE tucks away after 2 s), the Live choice stays on until the task finishes or is stopped, fields the chosen action does not use are hidden, collapsible Pace & limits and Advanced sections, a one-line summary above Start, sidebar badges, activity filters and search, Saved setups under the Live session card, a real factory reset, a first-run checklist, Ctrl+Enter to start, a single scrollbar and no pinned bars in the popup, and a redesigned on-page Aurora panel.
+
 ## 1.5.4
 - Comments: TikTok showed "Something went wrong" in the comments panel after the first typed character. Typing now places the caret inside the editor text leaf (not on the outer wrapper), clicks the box first, and switches the side panel from "You may like" to "Comments" when needed.
 
