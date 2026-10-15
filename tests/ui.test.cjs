@@ -11,6 +11,7 @@ try{
  const vis=(pg,sel)=>pg.evaluate(s=>{const e=document.querySelector(s);return !!e&&!e.hidden&&getComputedStyle(e).display!=='none'&&!e.closest('[hidden]');},sel);
  const setDry=(pg,v)=>pg.evaluate(v=>{const e=document.getElementById('dry');e.checked=v;e.dispatchEvent(new Event('change',{bubbles:true}));},v);
  const {ctx,pg:ui}=await open('dashboard.html');const act=a=>ui.selectOption('#action',a),src=m=>ui.selectOption('#mode',m);
+ check('the studio opens in the light theme by default',!await ui.evaluate(()=>document.body.classList.contains('dark')));
  check('studio opens in PREVIEW MODE with a "Start preview" button',/PREVIEW MODE/.test(await ui.textContent('#modeBar'))&&/Start preview/.test(await ui.textContent('#start')));
  check('studio header shows the installed version',/v9\.9\.9/.test(await ui.textContent('header .badge')));
  await setDry(ui,false);check('unticking Preview only switches to LIVE MODE / "Start live task"',/LIVE MODE/.test(await ui.textContent('#modeBar'))&&/Start live task/.test(await ui.textContent('#start')));
@@ -24,7 +25,11 @@ try{
  await job('completed',false);check('when the live task is done the form returns to Preview',await ui.isChecked('#dry')&&/Start preview/.test(await ui.textContent('#start')));
  await setDry(ui,false);await job('running',true);await job('completed',true);check('a finished preview run does not flip a live choice made for the next task',!await ui.isChecked('#dry'));await setDry(ui,true);
  await ui.evaluate(()=>chrome.storage.local.set({job:{status:'running',done:1,nextAt:Date.now()+20000,config:{dry:false,limit:3,action:'like',delay:30},queue:[{},{}]}}).then(()=>render()));
- check('Live session shows a counter and countdown while running',/1\/3 done/.test(await ui.textContent('#nowline'))&&/2 steps left/.test(await ui.textContent('#nowline'))&&/Next step in \d+s/.test(await ui.textContent('#nowline')));
+ check('Live session shows a counter and countdown while running',/1\/3 done/.test(await ui.textContent('#nowline'))&&/2 steps left/.test(await ui.textContent('#nowline'))&&/next in \d+s/i.test(await ui.textContent('#nowline')));
+ await ui.evaluate(()=>chrome.storage.local.set({walk:null,job:{id:'y',status:'running',done:1,total:3,finished:[{label:'@ann',state:'done',n:1}],nextAt:Date.now()+20000,config:{dry:false,limit:9,action:'like',delay:30},queue:[{label:'@bob'},{label:'@cy'}]}}).then(()=>render()));
+ check('Live session shows "Target 2 of 3 · @bob" and lists finished/current/upcoming targets',/Target 2 of 3 · @bob/.test(await ui.textContent('#nowline'))&&await ui.evaluate(()=>document.querySelectorAll('#targetList>div').length===3));
+ await ui.evaluate(()=>chrome.storage.local.set({job:{id:'y',status:'paused',done:1,total:3,finished:[],message:'x',config:{dry:false,limit:9,action:'like',delay:30},queue:[{label:'@bob'}]}}).then(()=>render()));
+ check('a paused task offers Skip this target',await vis(ui,'#skipTarget')&&await vis(ui,'#bannerSkip'));
  await job('completed',true);await setDry(ui,true);
  // hiding unused fields
  await act('like');await src('users');check('Like on profiles shows posts-per-profile and source, hides comment text and discovery limit',await vis(ui,'#perUser')&&await vis(ui,'#mode')&&!await vis(ui,'#commentGroup')&&!await vis(ui,'#scanGroup'));

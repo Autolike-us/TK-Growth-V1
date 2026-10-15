@@ -7,7 +7,6 @@
   shadow.innerHTML = `<style>
     :host{all:initial;font:14px system-ui,-apple-system,"Segoe UI",sans-serif;
       --bg:#fff;--ink:#1c1e21;--muted:#65676b;--line:#dadde1;--soft:#f0f2f5;--accent:#fe2c55;--ok:#12a594;--bad:#d4222a;--warnbg:#fff3d6;--warnink:#8a5200;--livebg:#ffe9ea;--liveink:#b3202a}
-    @media(prefers-color-scheme:dark){:host{--bg:#242526;--ink:#e4e6eb;--muted:#b0b3b8;--line:#3e4042;--soft:#3a3b3c;--warnbg:#4a3a14;--warnink:#ffcf7a;--livebg:#4a2326;--liveink:#ff9aa0}}
     *{box-sizing:border-box}
     button,input{font:inherit;color:inherit}
     button{cursor:pointer;border:1px solid var(--line);border-radius:12px;background:var(--soft);color:var(--ink);padding:9px 13px;font-weight:600}
@@ -45,7 +44,7 @@
       <div class="row"><button id="preview" class="primary">Preview profile</button></div>
       <p class="note">Checks up to 3 videos. Preview never sends engagement actions.</p>
     </div>
-    <div class="row" id="controls"><button id="pause">Pause</button><button id="resume">Resume</button><button id="stop">Stop</button></div>
+    <div class="row" id="controls"><button id="pause">Pause</button><button id="resume">Resume</button><button id="skip">↷ Skip this target</button><button id="stop">Stop</button></div>
     <div class="row"><button id="studio">Open full studio</button><button id="check">Check page</button></div>
     <div class="row" id="reportRow"><button id="copyReport">Copy error report</button></div>
     <pre id="report" hidden></pre>
@@ -65,14 +64,16 @@ const profile = AuroraSelectors.profileName(location.href);
   $('studio').onclick=()=>send('openStudio');
   $('copyReport').onclick=async()=>{try{const t=await globalThis.AuroraReport.build(80);await navigator.clipboard.writeText(t);$('message').textContent='Error report copied. Paste it into your message.';}catch(e){$('message').textContent='Could not copy the report: '+e.message;}};
   $('check').onclick=async()=>{const r=$('report');try{const text=globalThis.AuroraDiagnose?globalThis.AuroraDiagnose():'Check unavailable on this page.';r.textContent=text;r.hidden=false;try{await navigator.clipboard.writeText(text);$('message').textContent='Page check copied to your clipboard.';}catch{$('message').textContent='Page check shown below.';}}catch(e){r.textContent='Check failed: '+e.message;r.hidden=false;}};
-  for(const action of ['pause','resume','stop'])$(action).onclick=()=>send(action);
+  for(const action of ['pause','resume','stop','skip'])$(action).onclick=()=>send(action==='skip'?'skipTarget':action);
   let wasPaused=false,wasRunning=false,lastJob=null;
   // "Target 2 of 5 · name · next in 24s", refreshed every second from the last job we saw.
+  const walkOf=()=>null,doneNow=job=>job?.done||0;
   function tickNow(){
     const job=lastJob,el=$('now');if(!job){el.hidden=true;return;}
-    const left=job.queue?.length||0,part='\u00b7 '+(job.done||0)+'/'+(job.config?.limit||'?')+' done'+(left?' \u00b7 '+left+' step'+(left===1?'':'s')+' left':'');
-    if(job.status==='running'){const s=Math.max(0,Math.round(((job.nextAt||0)-Date.now())/1000));el.textContent='\u25b6 '+(s?'Next step in '+s+'s ':'Working\u2026 ')+part;el.hidden=false;}
-    else if(job.status==='paused'){el.textContent='\u23f8 Paused '+part;el.hidden=false;}
+    const left=job.queue?.length||0,w=walkOf(job),total=job.total||0,idx=total?Math.min((job.finished?.length||0)+1,total):0,label=job.queue?.[0]?.label;
+    const lead=(idx?'Target '+idx+' of '+total+' \u00b7 ':'')+(label?label+' \u00b7 ':''),part=doneNow(job)+'/'+(job.config?.limit||'?')+' done'+(left?' \u00b7 '+left+' step'+(left===1?'':'s')+' left':'');
+    if(job.status==='running'){const s=Math.max(0,Math.round((Math.max(job.nextAt||0,w?.until||0)-Date.now())/1000));el.textContent='\u25b6 '+lead+(w?.n?'post '+w.n+'/'+w.max+' \u00b7 ':'')+(s?(w?.until>Date.now()?'next post in ':'next in ')+s+'s \u00b7 ':'working\u2026 \u00b7 ')+part;el.hidden=false;}
+    else if(job.status==='paused'){el.textContent='\u23f8 Paused \u00b7 '+lead+part;el.hidden=false;}
     else el.hidden=true;
   }
   setInterval(tickNow,1000);
@@ -89,7 +90,7 @@ const profile = AuroraSelectors.profileName(location.href);
     wasRunning=running;wasPaused=paused;
     // Only show what applies right now.
     $('idle').hidden=active;
-    $('controls').hidden=!active;$('pause').hidden=!running;$('resume').hidden=!paused;$('stop').hidden=!active;
+    $('controls').hidden=!active;$('pause').hidden=!running;$('resume').hidden=!paused;$('skip').hidden=!(paused&&(job.queue?.length||0)>0);$('stop').hidden=!active;
     $('reportRow').hidden=!paused;
     const bar=$('bar');bar.hidden=!active;if(active){bar.max=Number(job.config?.limit)||10;bar.value=job.done||0;}
     const qp=$('quickPause');qp.hidden=!active;qp.textContent=paused?'▶ Resume':'⏸ Pause';qp.onclick=()=>send(paused?'resume':'pause');

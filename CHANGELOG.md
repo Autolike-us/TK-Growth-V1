@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0
+- The panel and the Live session card show the same progress line on every site: "Target 2 of 5 · @name · post 2/3 · next post in 24s · 1/9 done", a finished/current/upcoming target list, and a "Skip this target & continue" button when paused.
+- The studio, popup and on-page panel now open in the light theme by default (the theme switch still remembers your choice).
+
 ## 1.6.1
 - The Live session card and the on-page Aurora panel show a running counter again: actions done / limit, steps left and a countdown to the next step.
 
