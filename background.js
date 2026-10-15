@@ -77,12 +77,12 @@ async function tick(){
    if(job.navigation?.target===step.url&&job.navigation.attempts>=2)throw Error('TikTok redirected away from this target. Check the task tab and resume; Aurora stopped retrying the URL.');
    job.navigation={target:step.url,attempts:job.navigation?.target===step.url?job.navigation.attempts+1:1};job.message='Opening '+step.url;job.nextAt=Date.now()+2000;await save(job);await dlog('info','Opening '+short(step.url)+(job.navigation.attempts>1?` (attempt ${job.navigation.attempts})`:''));await chrome.tabs.update(job.tabId,{url:step.url,active:true});await schedule(job);return;
   }
-  const action=['account','engage','walk'].includes(step.kind)&&!job.config.dry;let room=null;
+  const action=['account','engage','walk','listfollow'].includes(step.kind)&&!job.config.dry;let room=null;
   if(action&&job.config.dailyCap){const used=await dailyCount();if(used>=job.config.dailyCap)throw Error(`Daily cap reached (${job.config.dailyCap} actions today). Resume tomorrow or raise the cap in the studio.`);room=job.config.dailyCap-used;}
   job.navigation=null;job.message='Reading TikTok: '+step.kind;await save(job);
   if(action){job.inFlight=true;await save(job);}
   await dlog('info',`Step ${step.kind} ${short(step.url)}${job.config.dry?' [preview]':''}`);
-  const r=await sendStep(job,step.kind==='walk'?{...step,done:job.done||0,room}:step);
+  const r=await sendStep(job,['walk','listfollow'].includes(step.kind)?{...step,done:job.done||0,room}:step);
   const latest=(await chrome.storage.local.get('job')).job;if(latest?.id!==job.id||latest.status!=='running')return;
   job.inFlight=false;await save(job);
   if(r?.error&&RETRYABLE.test(r.error)&&(job.retries||0)<3){job.retries=(job.retries||0)+1;job.message=`TikTok was still loading (${r.error}) Retrying ${job.retries}/3…`;job.nextAt=Date.now()+8000;await save(job);await dlog('warn',`Retry ${job.retries}/3 after: ${r.error}`,ctx(r));await schedule(job);return;}
@@ -91,10 +91,10 @@ async function tick(){
   if(r.wait){job.message=r.wait;job.nextAt=Date.now()+3000;await save(job);await schedule(job);return;}
   try{await chrome.storage.local.remove('walk');}catch{}job.queue.shift();const more=AuroraEngine.expand(job,step,r);job.queue.unshift(...more);
   // Targets finished so far (for "Target 2 of 5"); a discovery step is replaced by the targets it found.
-  if(['walk','account','engage'].includes(step.kind))closeStep(job,step,r);else job.total=Math.max((job.finished?.length||0),(job.total||0)-1+more.length);
+  if(['walk','account','engage','listfollow'].includes(step.kind))closeStep(job,step,r);else job.total=Math.max((job.finished?.length||0),(job.total||0)-1+more.length);
   let gap=quick();
   if(['users','posts','author'].includes(step.kind))job.message=`Discovered ${more.length} ${step.kind==='posts'?'posts':'profiles'}. ${r.note||''}`;
-  else{if(r.performed||r.preview){const n=step.kind==='walk'?Math.max(1,r.count||1):1;gap=pause(job);job.done=(job.done||0)+n;if(r.performed){job.counts[job.config.action]+=n;for(let i=0;i<n;i++)await bumpDaily();}else job.previewed+=n;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
+  else{if(r.performed||r.preview){const n=['walk','listfollow'].includes(step.kind)?Math.max(1,r.count||1):1;gap=pause(job);job.done=(job.done||0)+n;if(r.performed){job.counts[job.config.action]+=n;for(let i=0;i<n;i++)await bumpDaily();}else job.previewed+=n;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
   await log(job.message,step.url);await dlog('info','→ '+job.message,/^Skipped/.test(job.message||'')?ctx(r):undefined);
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
   job.nextAt=Date.now()+gap;await save(job);await schedule(job);

@@ -215,6 +215,56 @@
   const where=name?'on @'+name:'from '+label;
   return c.dry?{preview:true,count:acted,message:`Preview: would ${c.action==='comment'?'comment on':'like'} ${acted} video${acted===1?'':'s'} ${where}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`${verb[0].toUpperCase()+verb.slice(1)} ${acted} video${acted===1?'':'s'} ${where}${extra}.`};
  }
+ // ===== Follow from a followers/following list in place: open the list, press Follow on each row, scroll for more (no profile pages are opened). =====
+ async function listFollow(s,c,id,actor){
+  const owner=s.username,label=s.source+' of @'+owner,Label=s.source==='following'?'Following':'Followers';
+  if(S.profileName(location.href)?.toLowerCase()!==owner)throw Error('Profile changed; refusing to act on a different account.');
+  const popup=()=>[...document.querySelectorAll('[data-e2e="follow-info-popup"]')].find(e=>D.visible(e))||D.listDialog(s.source);
+  let dialog=popup();
+  if(!dialog){const open=await until(()=>S.listControl(D.scope()||document,s.source),id,15000);if(!open)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);await think(600,1300);await active(id);D.press(open);dialog=await until(popup,id,10000);}
+  if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
+  // Make sure the right tab (Following / Followers) is showing.
+  {const tab=[...dialog.querySelectorAll('div,span,button,[role="tab"]')].filter(e=>D.visible(e)&&!e.children.length&&new RegExp('^'+Label+'$','i').test(e.textContent.trim()))[0];if(tab){D.press(tab.closest('[class*="TabItem"],[role="tab"]')||tab);await think(900,1500);dialog=popup()||dialog;}}
+  const rows=()=>{const d=popup()||dialog;return [...d.querySelectorAll('li')].map(li=>{const a=li.querySelector('a[href*="/@"]'),name=S.profileName(a?.href||'')?.toLowerCase(),btn=li.querySelector('[data-e2e="follow-button"]');return name&&btn&&D.visible(btn)?{li,name,btn}:null;}).filter(Boolean);};
+  const state=b=>{const t=(b.textContent||'').trim();return /^(Following|Friends|Requested)$/i.test(t)?'done':/^Follow( back)?$/i.test(t)?'follow':'other';};
+  if(!await until(()=>rows().length,id,12000))throw Error(`The ${s.source} list is empty or TikTok did not expose accounts.`);
+  const verb='followed';
+  const max=Math.max(1,Math.min(c.scanLimit,Math.max(1,(c.limit||1)-(s.done||0)),s.room==null?Infinity:Math.max(1,s.room)));
+  T('listfollow',label,'rows',rows().length,'max',max);
+  const seen=new Set();let acted=0,skipped=0,stale=0;
+  try{
+   while(acted<max&&seen.size<c.scanLimit&&stale<4){
+    await active(id);
+    const row=rows().find(r=>!seen.has(r.name));
+    if(!row){
+     // nothing new in view: scroll the list down so TikTok loads more
+     const before=rows().length,box=D.scrollContainer(popup()||dialog);
+     if(box)box.scrollTop+=Math.max(300,box.clientHeight*0.85);else window.scrollBy(0,600);
+     await wait(1300);stale=rows().length>before?0:stale+1;continue;
+    }
+    stale=0;seen.add(row.name);
+    row.li.scrollIntoView({block:'center',behavior:'instant'});
+    if(c.exclude.includes(row.name)||row.name===actor){skipped++;continue;}
+    const st=state(row.btn);
+    if(st!=='follow'){skipped++;continue;}   // already following / requested
+    await progress(id,acted,label+': @'+row.name+' — '+(c.dry?'checking':'following')+'…',0,seen.size,max);
+    if(c.dry){acted++;await progress(id,acted,label+': @'+row.name+' checked · '+acted+'/'+max,0,seen.size,max);continue;}
+    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
+    const r=await perform(`${actor}:follow:${row.name}:${id}`,id,()=>{(rows().find(x=>x.name===row.name)||row).btn.click();},()=>{const now=rows().find(x=>x.name===row.name);return !now||state(now.btn)==='done';},`Followed @${row.name}.`);
+    if(r.performed){
+     acted++;
+     const ms=Math.round(c.delay*1000*(1+Math.random()*0.4));
+     await progress(id,acted,label+': followed @'+row.name+' ✓ · '+acted+'/'+max,Date.now()+ms,seen.size,max);
+     if(acted<max)await sleepActive(ms,id);
+    }else skipped++;
+   }
+  }finally{
+   try{const x=document.querySelector('[data-e2e="follow-popup-close"]');if(x&&D.visible(x))x.click();else document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:27,bubbles:true}));await wait(600);}catch{}
+  }
+  if(!acted)return {message:`Skipped ${label}: nobody to follow in the first ${seen.size} accounts${skipped?` (${skipped} already followed, excluded or yourself)`:''}.`};
+  const extra=skipped?` (${skipped} skipped)`:'';
+  return c.dry?{preview:true,count:acted,message:`Preview: would follow ${acted} account${acted===1?'':'s'} from the ${label}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`Followed ${acted} account${acted===1?'':'s'} from the ${label}${extra}.`};
+ }
  async function step(s,c,id){
   await active(id);
   if(!await until(()=>D.scope(),id,15000))throw Error('TikTok did not render this page. Check access and resume.');
@@ -269,6 +319,7 @@
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
    return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back'),`Unfollowed @${name}.`);
   }
+  if(s.kind==='listfollow')return listFollow(s,c,id,actor);
   if(s.kind==='walk')return walk(s,c,id,actor);
   if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
   return postAction(c,id,root,actor);
