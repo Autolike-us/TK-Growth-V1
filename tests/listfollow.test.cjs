@@ -5,12 +5,12 @@ const MOCK=`window.data={job:{id:'test',status:'running'},receipts:{},history:[]
 window.chrome={runtime:{id:'extension',onMessage:{addListener:f=>listeners.push(f)},sendMessage:async()=>({ok:true})},storage:{local:{get:async()=>structuredClone(data),set:async x=>Object.assign(data,structuredClone(x)),remove:async()=>{}},onChanged:{addListener:()=>{}}}};
 const nt=window.setTimeout;window.setTimeout=(f,ms,...a)=>nt(f,Math.min(ms||0,10),...a);`;
 // Mirrors TikTok's markup: profile counts (data-e2e="following"/"followers"), the follow-info-popup dialog with tabs and a scrolling list of <li> rows, each with a data-e2e="follow-button".
-const page=(states)=>`<html lang="en"><body><a data-e2e="profile-icon" href="https://www.tiktok.com/@me">me</a><main><div data-e2e="user-page"><h1 data-e2e="user-title">Suis</h1><h2 data-e2e="user-subtitle">jeff509vertilusdo</h2>
-<h3><div><strong data-e2e="following-count">5059</strong><span data-e2e="following">Following</span></div><div><strong data-e2e="followers-count">209</strong><span data-e2e="followers">Followers</span></div></h3></div></main>
+const page=(states)=>`<html lang="en"><body><div id="app"><nav><a data-e2e="nav-following" href="https://www.tiktok.com/following"><span>Following</span></a></nav><a data-e2e="profile-icon" href="https://www.tiktok.com/@me">me</a><div data-e2e="user-page"><h1 data-e2e="user-title">Suis</h1><h2 data-e2e="user-subtitle">jeff509vertilusdo</h2>
+<h3><div><strong data-e2e="following-count">5059</strong><span data-e2e="following">Following</span></div><div><strong data-e2e="followers-count">209</strong><span data-e2e="followers">Followers</span></div></h3></div></div>
 <style>#list{max-height:200px;overflow-y:auto}#list li{height:60px;list-style:none}</style>
 <script>
 window.__loc={pathname:'/@jeff509vertilusdo',get href(){return 'https://www.tiktok.com'+this.pathname;}};
-var states=${JSON.stringify(states)};window.follows=[];window.tabClicks=[];window.opened=null;var shown=6,dlg=null;
+var states=${JSON.stringify(states)};window.follows=[];window.tabClicks=[];window.opened=null;window.wrongNav=false;var shown=6,dlg=null;
 function row(i){const n=states[i];return '<li><div><div><a href="https://www.tiktok.com/@'+n.name+'"><div><p>'+n.name+'</p></div></a><div><button type="button" data-e2e="follow-button" aria-label="Follow '+n.name+'">'+n.text+'</button></div></div></div></li>';}
 function fill(){if(!dlg)return;const list=dlg.querySelector('#list');list.innerHTML=states.slice(0,shown).map((_,i)=>row(i)).join('');list.querySelectorAll('button').forEach((b,i)=>b.onclick=()=>{if(states[i].text==='Follow'){states[i].text='Following';window.follows.push(states[i].name);b.textContent='Following';}});}
 function openDialog(which){window.opened=which;dlg=document.createElement('section');dlg.setAttribute('role','dialog');
@@ -19,7 +19,7 @@ function openDialog(which){window.opened=which;dlg=document.createElement('secti
  dlg.querySelectorAll('.x--DivTabItem').forEach(t=>t.addEventListener('click',()=>window.tabClicks.push(t.firstElementChild?t.firstElementChild.textContent:t.textContent)));
  dlg.querySelector('#list').addEventListener('scroll',e=>{const l=e.target;if(l.scrollTop+l.clientHeight>=l.scrollHeight-30&&shown<states.length){shown=Math.min(states.length,shown+6);fill();}});
  dlg.querySelector('[data-e2e="follow-popup-close"]').onclick=()=>{dlg.remove();dlg=null;};}
-document.querySelector('[data-e2e="followers"]').onclick=()=>openDialog('followers');document.querySelector('[data-e2e="following"]').onclick=()=>openDialog('following');
+document.querySelector('nav a').addEventListener('click',e=>{e.preventDefault();window.wrongNav=true;});document.querySelector('[data-e2e="followers"]').onclick=()=>openDialog('followers');document.querySelector('[data-e2e="following"]').onclick=()=>openDialog('following');
 </script></body></html>`;
 const names=(over={})=>Array.from({length:14},(_,i)=>({name:'u'+(i+1),text:'Follow',...(over[i+1]||{})}));
 const STATES=names({2:{text:'Following'},5:{name:'me'},9:{text:'Requested'}});
@@ -37,7 +37,7 @@ try{const ctx=await browser.newContext();
  ({r,pg}=await run(STATES,{scanLimit:3}));check('the scan limit caps how many list rows are looked at',r.performed&&r.count===2&&await pg.evaluate(()=>JSON.stringify(follows)===JSON.stringify(['u1','u3'])));
  ({r}=await run(STATES,{},{room:2}));check('the remaining daily cap is respected',r.performed&&r.count===2);
  ({r}=await run(STATES,{limit:5},{done:4}));check('the remaining task limit is respected',r.performed&&r.count===1);
- ({r,pg}=await run(STATES,{mode:'following'},{source:'following',label:'following of @jeff509vertilusdo'}));check('the following list is opened and its tab selected',r.performed&&await pg.evaluate(()=>opened==='following'&&tabClicks.includes('Following')));
+ ({r,pg}=await run(STATES,{mode:'following'},{source:'following',label:'following of @jeff509vertilusdo'}));check('the following list is opened (not the Following feed in the left menu) and its tab selected',r.performed&&await pg.evaluate(()=>opened==='following'&&tabClicks.includes('Following')&&!wrongNav));
  ({r}=await run(names(Object.fromEntries(Array.from({length:14},(_,i)=>[i+1,{text:'Following'}]))),{}));check('a list where everyone is already followed is skipped politely',!r.performed&&/Skipped/.test(r.message));
  console.log('\n'+passed+' list-follow checks passed');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1);});

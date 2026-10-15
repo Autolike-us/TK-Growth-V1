@@ -221,7 +221,7 @@
   if(S.profileName(location.href)?.toLowerCase()!==owner)throw Error('Profile changed; refusing to act on a different account.');
   const popup=()=>[...document.querySelectorAll('[data-e2e="follow-info-popup"]')].find(e=>D.visible(e))||D.listDialog(s.source);
   let dialog=popup();
-  if(!dialog){const open=await until(()=>S.listControl(D.scope()||document,s.source),id,15000);if(!open)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);await think(600,1300);await active(id);D.press(open);dialog=await until(popup,id,10000);}
+  if(!dialog){const open=await until(()=>S.listControl(document,s.source),id,15000);if(!open)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);await think(600,1300);await active(id);D.press(open);dialog=await until(popup,id,10000);}
   if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
   // Make sure the right tab (Following / Followers) is showing.
   {const tab=[...dialog.querySelectorAll('div,span,button,[role="tab"]')].filter(e=>D.visible(e)&&!e.children.length&&new RegExp('^'+Label+'$','i').test(e.textContent.trim()))[0];if(tab){D.press(tab.closest('[class*="TabItem"],[role="tab"]')||tab);await think(900,1500);dialog=popup()||dialog;}}
