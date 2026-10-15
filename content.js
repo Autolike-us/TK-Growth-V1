@@ -86,7 +86,7 @@
   if(actor&&author===actor)return {message:'Skipped: this is your own post.'};
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
   if(c.action==='like'){
-   const button=await until(()=>D.likeButton(root,author),id);if(!button&&/\/photo\//.test(location.pathname))return {message:'Skipped: Like control not found on this photo post (photo layouts can differ). Use Check page if this repeats.'};if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}).`);
+   const button=await until(()=>D.likeButton(root,author),id);if(!button&&/\/photo\//.test(location.pathname))return {message:'Skipped: Like control not found on this photo post (photo layouts can differ). Use Check page if this repeats.'};if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}; the page has ${document.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"]').length} like icons, ${[...document.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"]')].filter(e=>D.visible(e)).length} visible).`);
    const state=D.likeState(button);T('like candidates',D.likeCandidates(root).length,'state',state);
    if(state===true)return {message:'Skipped: video already liked.'};
    if(state!==false)throw Error('Cannot read whether this video is liked. No click sent.');
