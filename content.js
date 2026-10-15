@@ -78,62 +78,8 @@
   if(!ok)throw Error('Action was sent but could not be confirmed. It will not be automatically repeated. Check TikTok.');
   await receipt(key,'confirmed');return {performed:true,message};
  }
- async function step(s,c,id){
-  await active(id);
-  if(!await until(()=>D.scope(),id,15000))throw Error('TikTok did not render this page. Check access and resume.');
-  const root=D.scope();T('step',s.kind,c.action||'','container',root.tagName.toLowerCase()+(root.id?'#'+root.id:''));
-  if(S.pageKey(location.href)!==S.pageKey(s.url))throw Error('TikTok changed targets. Nothing was submitted.');
-  if(s.kind==='posts'){
-   // Read only the profile/hashtag video grid (never menus or side panels), and on a profile only that profile's own videos.
-   const grid='[data-e2e="user-post-item-list"],[data-e2e="challenge-item-list"]';
-   const read=()=>{const r=D.scope()||root,area=r.querySelector(grid)||r;return [...area.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean).filter(u=>!s.username||u.split('/')[3]==='@'+s.username);};
-   const empty=()=>{if(!s.username)return null;const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':null;};
-   const ready=await until(()=>read().length||empty(),id,15000);
-   if(!ready)throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
-   if(!read().length)T('empty profile:',ready);
-   if(!read().length)return {posts:[],note:`Skipped @${s.username}: ${ready}.`};
-   T('post links',read().length);
-   const posts=await collect(root,read,c.mode==='hashtag'?c.scanLimit:c.perUser,id);
-   return {posts,note:'Collected available posts within your scan limit.'};
-  }
-  if(s.kind==='users'){
-   if(s.source==='commenters'){
-    if(!await until(()=>D.commenters(root).length,id))throw Error('No rendered comment authors found. Open/load comments on the task post and resume.');
-    return {users:await collect(root,()=>D.commenters(root),c.scanLimit,id),note:'Comment authors only; hidden comments are not accessible.'};
-   }
-   let dialog=D.listDialog(s.source);
-   if(!dialog){const button=await until(()=>S.listControl(root,s.source),id);if(!button)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);button.click();dialog=await until(()=>D.listDialog(s.source),id);}
-   if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
-   const own=S.profileName(location.href)?.toLowerCase(),listed=()=>D.names(dialog).filter(n=>n!==own);
-   if(!await until(()=>listed().length,id))throw Error('The list is empty or TikTok did not expose accounts.');
-   return {users:await collect(dialog,listed,c.scanLimit,id),note:'Collected available accounts within your scan limit.'};
-  }
-  if(s.kind==='author'){const author=await until(()=>D.author(root),id);if(!author)throw Error('Cannot identify this post author.');return {users:[author]};}
-  const actor=D.actor();T('signed in',!!actor);
-  if(s.kind==='account'){
-   const name=S.profileName(location.href)?.toLowerCase();if(name!==s.username)throw Error('Profile changed; refusing to act on a different account.');
-   if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};
-   const hdr=()=>D.profileHeader(D.scope()||root);let header=hdr();
-   const ids=()=>[...hdr().querySelectorAll('[data-e2e="user-title"],[data-e2e="user-subtitle"]')].map(e=>e.textContent.trim().replace(/^@/,'').toLowerCase());
-   const verified=await until(()=>ids().includes(name)||(hdr()!==document.body&&(hdr().innerText||'').toLowerCase().includes(name)&&ids().length),id,15000);
-   if(!verified)throw Error('Cannot verify the rendered profile. No account action sent.');header=hdr();
-   await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends')||D.button(hdr(),'Edit profile'),id);
-   if(D.button(hdr(),'Edit profile'))return {message:'Skipped: your own profile.'};
-   if(c.action==='follow'){
-    if(D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'))return {message:'Skipped: already following or requested.'};
-    const button=D.button(hdr(),'Follow')||D.button(hdr(),'Follow back');if(!button)throw Error('Follow control unavailable.');
-    if(c.dry)return {preview:true,message:`Preview: follow @${name}. No change made.`};
-    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
-    return perform(`${actor}:follow:${name}:${id}`,id,()=>button.click(),()=>D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'),`Followed/requested @${name}.`);
-   }
-   if(c.action!=='unfollow'||c.mode!=='users')throw Error('Unfollow requires an explicit username list.');
-   const following=D.button(hdr(),'Following')||D.button(hdr(),'Friends');if(!following)return {message:'Skipped: not currently following.'};
-   if(c.dry)return {preview:true,message:`Preview: unfollow @${name}. No change made.`};
-   if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
-   return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back'),`Unfollowed @${name}.`);
-  }
-  if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
-  const urlAuthor=new URL(s.url).pathname.split('/')[1].slice(1).toLowerCase();
+ async function postAction(c,id,root,actor){
+  const urlAuthor=new URL(S.postURL(location.href)||location.href).pathname.split('/')[1].slice(1).toLowerCase();
   const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);T('author found',!!author);
   // TikTok also accepts the numeric account id in the address; the video id (already matched above) is then the proof of identity.
   if(!author||(!/^\d+$/.test(urlAuthor)&&author!==urlAuthor))throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
@@ -195,6 +141,126 @@
    return perform(key,id,()=>submit.click(),()=>{const f=findField();return (!f||!D.fieldText(f).trim())&&ownComment();},'Posted your comment.');
   }
   throw Error('Unsupported post action.');
+
+ }
+
+ // ===== In-place walk: open the first video of a profile or hashtag/discover page, act, press the next-video arrow, repeat (no page loads between videos). =====
+ const progress=(id,acted,text,until,n,max)=>chrome.storage.local.set({walk:{id,acted,text,until:until||0,n:n||0,max:max||0,time:Date.now()}}).catch(()=>{});
+ async function sleepActive(ms,id){for(let t=0;t<ms;t+=1000){await active(id);await wait(Math.min(1000,ms-t));}}
+ const inVideo=()=>!!S.postURL(location.href);
+ // The next-video arrow of TikTok's video viewer; the keyboard's Down arrow does the same thing when the button cannot be found.
+ const nextArrow=()=>{const b=[...document.querySelectorAll('[data-e2e="arrow-right"],button[aria-label="Go to next video"],button[aria-label*="next video" i],[aria-label="Next video" i]')].find(e=>D.visible(e));return b?(b.closest('button,[role="button"]')||b):null;};
+ const pressKey=(key,code)=>{const el=document.activeElement&&document.activeElement!==document.body?document.activeElement:document.body;for(const t of ['keydown','keyup'])el.dispatchEvent(new KeyboardEvent(t,{key,code:key,keyCode:code,which:code,bubbles:true,cancelable:true}));};
+ // The part of the page that holds the video that is open now (its author, Like and Comment controls).
+ const videoRoot=()=>{const likes=D.likeCandidates(document),like=likes.find(e=>D.inView(e))||likes[0];for(let e=like;e&&e!==document.documentElement;e=e.parentElement)if(D.author(e))return e;return D.scope();};
+ const tilesOf=s=>{const area=document.querySelector('[data-e2e="user-post-item-list"],[data-e2e="challenge-item-list"],[data-e2e="search_top-item-list"]')||document.querySelector('main')||document.body;return [...area.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)&&D.visible(a)&&(!s.username||S.postURL(a.href).split('/')[3]==='@'+s.username));};
+ const emptyWhy=s=>{const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':!s.username&&/No results|Couldn.t find|No videos/i.test(t)?'no videos were found':null;};
+ async function closeVideo(startKey){
+  for(let n=0;n<3&&inVideo();n++){
+   const x=[...document.querySelectorAll('[data-e2e="browse-close"],button[aria-label="Close"]')].find(e=>D.visible(e));
+   if(x)(x.closest('button,[role="button"]')||x).click();else document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:27,bubbles:true}));
+   await wait(900);
+  }
+  if(S.pageKey(location.href)!==startKey){history.back();await wait(1200);}
+ }
+ async function walk(s,c,id,actor){
+  const name=s.username||null,label=name?'@'+name:s.label;
+  if(name){if(S.profileName(location.href)?.toLowerCase()!==name)throw Error('Profile changed; refusing to act on a different account.');if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};}
+  const startKey=S.pageKey(location.href);
+  if(inVideo())await closeVideo(startKey);
+  const tile=await until(()=>tilesOf(s)[0]||(emptyWhy(s)?'none':null),id,15000);
+  if(!tile||tile==='none')return {message:`Skipped ${label}: ${emptyWhy(s)||'no videos were found'}.`};
+  const verb=c.action==='comment'?'commented on':'liked';
+  const per=name?c.perUser:c.scanLimit;
+  const max=Math.max(1,Math.min(per,Math.max(1,(c.limit||1)-(s.done||0)),s.room==null?Infinity:Math.max(1,s.room)));
+  T('walk',label,'tiles',tilesOf(s).length,'max',max);await progress(id,0,label+': opening the first video…');
+  tile.scrollIntoView({block:'center',behavior:'instant'});await think(700,1500);await active(id);tile.click();
+  if(!await until(()=>{if(!inVideo())return false;const r=videoRoot();return r&&D.author(r);},id,15000))throw Error('The first video did not open. Check the task tab and resume.');
+  let acted=0,lastSkip='',skippedLiked=0;const visited=new Set();
+  try{
+   for(let i=0;i<max*4+6&&acted<max;i++){
+    await active(id);
+    const key=S.pageKey(location.href);if(!inVideo()||visited.has(key))break;visited.add(key);
+    await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action!=='like'||D.likeCandidates(r).length);},id,12000);
+    const root=videoRoot();if(!root)throw Error('Lost the open video. Check the task tab and resume.');
+    T('walk video',key);await progress(id,acted,label+': video '+visited.size+' — '+(c.dry?'checking':c.action==='comment'?'commenting':'liking')+'…',0,visited.size,max);
+    const r=await postAction(c,id,root,actor);
+    if(r.performed||r.preview)acted++;else{lastSkip=String(r.message||'').replace(/^Skipped:\s*/,'');if(/already liked/i.test(lastSkip))skippedLiked++;}
+    await progress(id,acted,label+': video '+visited.size+' '+(r.performed?'done ✓':r.preview?'checked':'skipped ('+lastSkip+')')+' · '+acted+'/'+max+(name?' on this profile':''),0,visited.size,max);
+    if(acted>=max)break;
+    // pace only after a real action; skipped videos move on quickly
+    if(r.performed){const ms=Math.round(c.delay*1000*(1+Math.random()*0.4));await progress(id,acted,label+': video '+visited.size+' done ✓ · '+acted+'/'+max+(name?' on this profile':''),Date.now()+ms,visited.size,max);await sleepActive(ms,id);}
+    await active(id);await think(700,1800);
+    const next=nextArrow();T('next arrow',!!next);
+    if(next)next.click();else pressKey('ArrowDown',40);
+    let moved=await until(()=>S.pageKey(location.href)!==key,id,next?6000:8000);
+    if(!moved&&next){T('Next arrow did not advance; trying the Down key');pressKey('ArrowDown',40);moved=await until(()=>S.pageKey(location.href)!==key,id,6000);}
+    if(!moved){T('Next did not advance: last video');break;}
+    await think(700,1500);
+   }
+  }finally{try{await closeVideo(startKey);}catch{}}
+  if(!acted)return {message:`Skipped ${label}: ${lastSkip||'nothing eligible'}.`};
+  const extra=skippedLiked?` (${skippedLiked} already liked skipped)`:'';
+  const where=name?'on @'+name:'from '+label;
+  return c.dry?{preview:true,count:acted,message:`Preview: would ${c.action==='comment'?'comment on':'like'} ${acted} video${acted===1?'':'s'} ${where}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`${verb[0].toUpperCase()+verb.slice(1)} ${acted} video${acted===1?'':'s'} ${where}${extra}.`};
+ }
+ async function step(s,c,id){
+  await active(id);
+  if(!await until(()=>D.scope(),id,15000))throw Error('TikTok did not render this page. Check access and resume.');
+  const root=D.scope();T('step',s.kind,c.action||'','container',root.tagName.toLowerCase()+(root.id?'#'+root.id:''));
+  if(S.pageKey(location.href)!==S.pageKey(s.url))throw Error('TikTok changed targets. Nothing was submitted.');
+  if(s.kind==='posts'){
+   // Read only the profile/hashtag video grid (never menus or side panels), and on a profile only that profile's own videos.
+   const grid='[data-e2e="user-post-item-list"],[data-e2e="challenge-item-list"]';
+   const read=()=>{const r=D.scope()||root,area=r.querySelector(grid)||r;return [...area.querySelectorAll('a[href]')].map(a=>S.postURL(a.href)).filter(Boolean).filter(u=>!s.username||u.split('/')[3]==='@'+s.username);};
+   const empty=()=>{if(!s.username)return null;const t=document.body.innerText||'';return /This account is private/i.test(t)?'the account is private':/No content|No videos yet|hasn.t published any videos|has no videos/i.test(t)?'it has no videos':/Couldn.t find this account|Account not found|this account (?:doesn.t|does not) exist/i.test(t)?'the profile is unavailable':null;};
+   const ready=await until(()=>read().length||empty(),id,15000);
+   if(!ready)throw Error('No posts appeared. Use an accessible hashtag/profile; check the task tab.');
+   if(!read().length)T('empty profile:',ready);
+   if(!read().length)return {posts:[],note:`Skipped @${s.username}: ${ready}.`};
+   T('post links',read().length);
+   const posts=await collect(root,read,c.mode==='hashtag'?c.scanLimit:c.perUser,id);
+   return {posts,note:'Collected available posts within your scan limit.'};
+  }
+  if(s.kind==='users'){
+   if(s.source==='commenters'){
+    if(!await until(()=>D.commenters(root).length,id))throw Error('No rendered comment authors found. Open/load comments on the task post and resume.');
+    return {users:await collect(root,()=>D.commenters(root),c.scanLimit,id),note:'Comment authors only; hidden comments are not accessible.'};
+   }
+   let dialog=D.listDialog(s.source);
+   if(!dialog){const button=await until(()=>S.listControl(root,s.source),id);if(!button)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);button.click();dialog=await until(()=>D.listDialog(s.source),id);}
+   if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
+   const own=S.profileName(location.href)?.toLowerCase(),listed=()=>D.names(dialog).filter(n=>n!==own);
+   if(!await until(()=>listed().length,id))throw Error('The list is empty or TikTok did not expose accounts.');
+   return {users:await collect(dialog,listed,c.scanLimit,id),note:'Collected available accounts within your scan limit.'};
+  }
+  if(s.kind==='author'){const author=await until(()=>D.author(root),id);if(!author)throw Error('Cannot identify this post author.');return {users:[author]};}
+  const actor=D.actor();T('signed in',!!actor);
+  if(s.kind==='account'){
+   const name=S.profileName(location.href)?.toLowerCase();if(name!==s.username)throw Error('Profile changed; refusing to act on a different account.');
+   if(c.exclude.includes(name)||actor===name)return {message:'Skipped: own or excluded profile.'};
+   const hdr=()=>D.profileHeader(D.scope()||root);let header=hdr();
+   const ids=()=>[...hdr().querySelectorAll('[data-e2e="user-title"],[data-e2e="user-subtitle"]')].map(e=>e.textContent.trim().replace(/^@/,'').toLowerCase());
+   const verified=await until(()=>ids().includes(name)||(hdr()!==document.body&&(hdr().innerText||'').toLowerCase().includes(name)&&ids().length),id,15000);
+   if(!verified)throw Error('Cannot verify the rendered profile. No account action sent.');header=hdr();
+   await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends')||D.button(hdr(),'Edit profile'),id);
+   if(D.button(hdr(),'Edit profile'))return {message:'Skipped: your own profile.'};
+   if(c.action==='follow'){
+    if(D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'))return {message:'Skipped: already following or requested.'};
+    const button=D.button(hdr(),'Follow')||D.button(hdr(),'Follow back');if(!button)throw Error('Follow control unavailable.');
+    if(c.dry)return {preview:true,message:`Preview: follow @${name}. No change made.`};
+    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
+    return perform(`${actor}:follow:${name}:${id}`,id,()=>button.click(),()=>D.button(hdr(),'Following')||D.button(hdr(),'Requested')||D.button(hdr(),'Friends'),`Followed/requested @${name}.`);
+   }
+   if(c.action!=='unfollow'||c.mode!=='users')throw Error('Unfollow requires an explicit username list.');
+   const following=D.button(hdr(),'Following')||D.button(hdr(),'Friends');if(!following)return {message:'Skipped: not currently following.'};
+   if(c.dry)return {preview:true,message:`Preview: unfollow @${name}. No change made.`};
+   if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
+   return perform(`${actor}:unfollow:${name}:${id}`,id,async()=>{following.click();const next=await until(()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back')||[...document.querySelectorAll('[role="dialog"]')].map(d=>D.button(d,'Unfollow')).find(Boolean),id);if(!next)throw Error('Unfollow outcome is uncertain. Check TikTok manually.');if(D.text(next)==='Unfollow'){await active(id);next.click();}},()=>D.button(hdr(),'Follow')||D.button(hdr(),'Follow back'),`Unfollowed @${name}.`);
+  }
+  if(s.kind==='walk')return walk(s,c,id,actor);
+  if(s.kind!=='engage')throw Error('Unknown step. Create a new task.');
+  return postAction(c,id,root,actor);
  }
  // Read-only report used by the on-page "Check page" button. Contains counts and yes/no only, no names or tokens.
  globalThis.AuroraDiagnose=()=>{
@@ -213,6 +279,7 @@
    ['Follow/Following button',kind==='profile'?mark(['Follow','Follow back','Following','Requested','Friends','Edit profile'].some(l=>D.button(root,l))):'n/a'],
    ['Comment box found',kind==='video'?mark(!!(D.commentField(root)||D.commentField(document))):'n/a'],
    ['Comments button found',kind==='video'?mark(!!D.commentsButton(root)):'n/a'],
+   ['Next-video arrow found',kind==='video'?mark(!!(document.querySelector('[data-e2e="arrow-right"],button[aria-label*="next video" i]'))):'n/a'],
    ['Video links on page',String([...root.querySelectorAll('a[href]')].filter(a=>S.postURL(a.href)).length)],
    ['Comment rows',String(D.commentRows(root).length)],
    ['Followers/following popup',mark(!!D.listDialog('followers')||!!D.listDialog('following'))],

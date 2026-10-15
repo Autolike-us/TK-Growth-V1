@@ -18,14 +18,19 @@ globalThis.AuroraEngine = {
     if(c.action==='comment'&&(!c.comment||c.comment.length>150))throw Error('Enter your comment text (1–150 characters).');
     if(c.action==='unfollow'&&c.mode!=='users')throw Error('Unfollow uses your explicit profile/user list.');return c;
   },
-  profileStep(name,c){return {label:'@'+name,kind:['follow','unfollow'].includes(c.action)?'account':'posts',url:`https://www.tiktok.com/@${name}`,username:name};},
+  // Like/comment walk a profile in place: open its first video, act, press the next-video arrow, repeat (no per-video page loads).
+  profileStep(name,c){return {label:'@'+name,kind:['follow','unfollow'].includes(c.action)?'account':'walk',url:`https://www.tiktok.com/@${name}`,username:name};},
   initial(c) {
     const value=String(c.target||'').trim();if(!value)throw Error('Enter a target.');
     const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video or photo URLs.');return url;};
     switch(c.mode){
       case 'users':return [...new Set(value.split(/[\s,]+/).map(x=>this.profile(x)))].filter(x=>!c.exclude.includes(x)).map(x=>this.profileStep(x,c));
       case 'posts':return [...new Set(value.split(/[\s,]+/).map(post))].map(url=>({kind:c.action==='follow'?'author':'engage',url,label:'post '+String(AuroraSelectors.pageKey(url)||'').replace(/^post:/,'')}));
-      case 'hashtag':{let tag=value.replace(/^#/,'');if(/^https?:/.test(value)){const key=AuroraSelectors.pageKey(value);if(!key?.startsWith('tag:'))throw Error('Paste a hashtag URL or enter #tag.');tag=key.slice(4);}if(!/^[\p{L}\p{N}_]+$/u.test(tag))throw Error('Enter one hashtag or its TikTok URL.');return [{label:'#'+tag,kind:'posts',url:'https://www.tiktok.com/tag/'+encodeURIComponent(tag)}];}
+      case 'hashtag':{
+        // A hashtag (#tag or /tag/ link) or a TikTok discover/search topic page. Like and comment walk the page in place; follow still collects the authors first.
+        const walkable=['like','comment'].includes(c.action);
+        if(/^https?:/.test(value)){const slug=AuroraSelectors.discoverSlug(value);if(slug)return [{label:'topic '+slug,kind:walkable?'walk':'posts',url:'https://www.tiktok.com/discover/'+encodeURIComponent(slug)}];}
+        let tag=value.replace(/^#/,'');if(/^https?:/.test(value)){const key=AuroraSelectors.pageKey(value);if(!key?.startsWith('tag:'))throw Error('Paste a hashtag or discover URL, or enter #tag.');tag=key.slice(4);}if(!/^[\p{L}\p{N}_]+$/u.test(tag))throw Error('Enter one hashtag or its TikTok URL.');return [{label:'#'+tag,kind:walkable?'walk':'posts',url:'https://www.tiktok.com/tag/'+encodeURIComponent(tag)}];}
       case 'followers':case 'following':return [{label:c.mode+' of @'+this.profile(value),kind:'users',source:c.mode,url:`https://www.tiktok.com/@${this.profile(value)}`}];
       case 'commenters':return [{label:c.mode+' of a post',kind:'users',source:c.mode,url:post(value)}];
       default:throw Error('Choose a discovery source.');

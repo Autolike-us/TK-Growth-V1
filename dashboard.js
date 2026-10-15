@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id); const fields=['action','comment','scanLimit','mode','target','perUser','limit','delay','maxAge','dailyCap','exclude','dry','videos'];
-const hints={users:'Separate usernames with commas or new lines.',followers:'One username. Loads available accounts from the follower dialog up to the discovery limit.',following:'One username. Loads available accounts from the following dialog up to the discovery limit.',commenters:'Paste a TikTok video or photo URL. Discovers currently rendered commenters.',hashtag:'Enter one #hashtag, its TikTok /tag/ URL.',posts:'Paste TikTok video or photo URLs, separated by commas or new lines.'};
+const hints={users:'Separate usernames with commas or new lines.',followers:'One username. Loads available accounts from the follower dialog up to the discovery limit.',following:'One username. Loads available accounts from the following dialog up to the discovery limit.',commenters:'Paste a TikTok video or photo URL. Discovers currently rendered commenters.',hashtag:'Enter one #hashtag, its TikTok /tag/ URL, or a TikTok discover page link.',posts:'Paste TikTok video or photo URLs, separated by commas or new lines.'};
 function settings(){return Object.fromEntries(fields.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value]));}
 let licenseOk=true,jobActive=false;const canRun=()=>licenseOk||$('dry').checked,refreshStart=()=>{$('start').disabled=jobActive||!canRun();};
 function notice(s){$('notice').textContent=s;}
@@ -23,7 +23,7 @@ function updateForm(){
  document.querySelector('label[for="target"]').textContent=unfollow?'Usernames to unfollow':'Target';
  document.querySelector('label[for="perUser"]').textContent=action==='comment'?'Videos to comment on per profile':'Videos to like per profile';
  paintMode();
- $('target').placeholder=({hashtag:'#travel or a hashtag URL',posts:'Video URLs',commenters:'A video URL'})[mode]||'@username, one or more usernames';
+ $('target').placeholder=({hashtag:'#travel, a hashtag URL or a discover link',posts:'Video URLs',commenters:'A video URL'})[mode]||'@username, one or more usernames';
 }
 $('mode').onchange=()=>{disarm();updateForm();};$('action').onchange=()=>{disarm();updateForm();rememberForm();};
 let armed=null;
