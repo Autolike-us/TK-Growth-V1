@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0
+- The panel and the Live session card show the same progress line on every site: "Target 2 of 5 · @name · post 2/3 · next post in 24s · 1/9 done", a finished/current/upcoming target list, and a "Skip this target & continue" button when paused.
+- The studio, popup and on-page panel now open in the light theme by default (the theme switch still remembers your choice).
+
+## 1.6.1
+- The Live session card and the on-page Aurora panel show a running counter again: actions done / limit, steps left and a countdown to the next step.
+
+## 1.6.0
+- Studio refresh (interface only; automation unchanged): always-visible PREVIEW/LIVE bar (LIVE tucks away after 2 s), the Live choice stays on until the task finishes or is stopped, fields the chosen action does not use are hidden, collapsible Pace & limits and Advanced sections, a one-line summary above Start, sidebar badges, activity filters and search, Saved setups under the Live session card, a real factory reset, a first-run checklist, Ctrl+Enter to start, a single scrollbar and no pinned bars in the popup, and a redesigned on-page Aurora panel.
+
 ## 1.5.4
 - Comments: TikTok showed "Something went wrong" in the comments panel after the first typed character. Typing now places the caret inside the editor text leaf (not on the outer wrapper), clicks the box first, and switches the side panel from "You may like" to "Comments" when needed.
 
