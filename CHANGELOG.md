@@ -2,6 +2,7 @@
 
 ## 1.0.0
 - Likes and comments now walk in place, like Facebook and Instagram: open the first video of a profile (or a hashtag / discover page such as /discover/printify-como-funciona-en-mexico), act, press TikTok's next-video arrow (Down key as a fallback), repeat. No more opening every video as its own page.
+- Follow on a hashtag or discover page now follows each video's author in place (the Follow button in the open video), instead of opening every video and then every profile. Repeated authors and people you already follow are skipped.
 - Follow from a followers/following list now happens in place: Aurora opens the list on the profile, presses Follow on each row (skipping people you already follow, request or exclude), scrolls for more and closes it. No profile pages are opened.
 - Pace floor lowered to 5 seconds between steps (default 20).
 - Preview works without a license; only live tasks need a key. The trial (3 days, no subscription or payment method) is advertised in the License box.

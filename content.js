@@ -80,6 +80,12 @@
  }
 // What the page looks like right now (for error reports): address, any dialog text, and the visible data-e2e names.
  const snapshot=()=>{try{const e2e=[...new Set([...document.querySelectorAll('[data-e2e]')].filter(e=>D.visible(e)).map(e=>e.getAttribute('data-e2e')))].slice(0,22).join(',');const dlg=[...document.querySelectorAll('[role="dialog"]')].filter(e=>D.visible(e)).map(e=>(e.innerText||'').replace(/\s+/g,' ').slice(0,50)).slice(0,2).join(' | ');return `path ${location.pathname}; dialogs: ${dlg||'none'}; visible: ${e2e}`.slice(0,420);}catch{return 'no snapshot';}};
+// The Follow button in the author card of the open video (never one from a comment row or a suggestion list).
+ const AUTHOR_SEL='[data-e2e="browse-username"],[data-e2e="video-author-uniqueid"],[data-e2e="browse-user-avatar"],[data-e2e="video-author-avatar"],[data-e2e="video-author-nickname"],[data-e2e="browse-user-name"]';
+ const followLabel=b=>D.text(b);
+ const authorFollow=root=>{const isF=b=>/^(Follow|Follow back|Following|Friends|Requested)$/i.test(followLabel(b));
+  for(const a of [...root.querySelectorAll(AUTHOR_SEL)].filter(x=>D.visible(x))){for(let e=a.parentElement,i=0;e&&i<6;e=e.parentElement,i++){if(e.querySelector('[data-e2e="comment-item"],[data-e2e="comment-level-1"]'))break;const b=D.controls(e).find(isF);if(b)return b;}}
+  return null;};
  async function postAction(c,id,root,actor){
   const urlAuthor=new URL(S.postURL(location.href)||location.href).pathname.split('/')[1].slice(1).toLowerCase();
   const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);T('author found',!!author);
@@ -87,6 +93,14 @@
   if(!author||(!/^\d+$/.test(urlAuthor)&&author!==urlAuthor))throw Error('Cannot verify the video author'+(author?` (page shows @${author}, expected @${urlAuthor})`:' (no author link found on the page)')+'. Nothing submitted.');
   if(actor&&author===actor)return {message:'Skipped: this is your own post.'};
   if(c.exclude.includes(author))return {message:'Skipped: excluded post author.'};
+  if(c.action==='follow'){
+   const btn=await until(()=>authorFollow(D.scope()&&D.author(D.scope())===author?D.scope():root)||authorFollow(root),id,10000);
+   if(!btn)return {message:'Skipped: no Follow button found next to the author.'};
+   if(/^(Following|Friends|Requested)$/i.test(followLabel(btn)))return {message:'Skipped: already following or requested.'};
+   if(c.dry)return {preview:true,message:`Preview: follow @${author}. No change made.`};
+   if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
+   return perform(`${actor}:follow:${author}:${id}`,id,()=>(authorFollow(root)||btn).click(),()=>{const b=authorFollow(root);return !b||/^(Following|Friends|Requested)$/i.test(followLabel(b));},`Followed @${author}.`);
+  }
   if(c.action==='like'){
    const button=await until(()=>D.likeButton(root,author),id);if(!button&&/\/photo\//.test(location.pathname))return {message:'Skipped: Like control not found on this photo post (photo layouts can differ). Use Check page if this repeats.'};if(!button)throw Error(`Cannot identify a unique video Like control (found ${D.likeCandidates(root).length}; the page has ${document.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"]').length} like icons, ${[...document.querySelectorAll('[data-e2e="browse-like-icon"],[data-e2e="like-icon"]')].filter(e=>D.visible(e)).length} visible).`);
    const state=D.likeState(button);T('like candidates',D.likeCandidates(root).length,'state',state);
@@ -172,21 +186,22 @@
   if(inVideo())await closeVideo(startKey);
   const tile=await until(()=>tilesOf(s)[0]||(emptyWhy(s)?'none':null),id,15000);
   if(!tile||tile==='none')return {message:`Skipped ${label}: ${emptyWhy(s)||'no videos were found'}.`};
-  const verb=c.action==='comment'?'commented on':'liked';
+  const verb=c.action==='comment'?'commented on':c.action==='follow'?'followed the authors of':'liked';
   const per=name?c.perUser:c.scanLimit;
   const max=Math.max(1,Math.min(per,Math.max(1,(c.limit||1)-(s.done||0)),s.room==null?Infinity:Math.max(1,s.room)));
   T('walk',label,'tiles',tilesOf(s).length,'max',max);await progress(id,0,label+': opening the first video…');
   tile.scrollIntoView({block:'center',behavior:'instant'});await think(700,1500);await active(id);tile.click();
   if(!await until(()=>{if(!inVideo())return false;const r=videoRoot();return r&&D.author(r);},id,15000))throw Error('The first video did not open. Check the task tab and resume.');
-  let acted=0,lastSkip='',skippedLiked=0;const visited=new Set(),retried=new Set();
+  let acted=0,lastSkip='',skippedLiked=0;const visited=new Set(),retried=new Set(),seenAuthors=new Set();
   try{
    for(let i=0;i<max*4+6&&acted<max;i++){
     await active(id);
     const key=S.pageKey(location.href);if(!inVideo()||visited.has(key))break;visited.add(key);
-    await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action!=='like'||D.likeCandidates(r).length);},id,12000);
+    await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action==='like'?D.likeCandidates(r).length:c.action==='follow'?authorFollow(r):true);},id,12000);
     const root=videoRoot();if(!root)throw Error('Lost the open video. Check the task tab and resume.');
-    T('walk video',key);await progress(id,acted,label+': video '+visited.size+' — '+(c.dry?'checking':c.action==='comment'?'commenting':'liking')+'…',0,visited.size,max);
-    let r;
+    T('walk video',key);await progress(id,acted,label+': video '+visited.size+' — '+(c.dry?'checking':c.action==='comment'?'commenting':c.action==='follow'?'following':'liking')+'…',0,visited.size,max);
+    let r;const who=c.action==='follow'?D.author(root):null;
+    if(who&&seenAuthors.has(who))r={message:'Skipped: this author was already handled.'};else{if(who)seenAuthors.add(who);
     try{r=await postAction(c,id,root,actor);}
     catch(e){
      if(c.action!=='comment'||!/comment box disappeared/.test(String(e.message))||retried.has(key))throw e;
@@ -195,6 +210,7 @@
      if(!inVideo()||S.pageKey(location.href)!==key){const again=tilesOf(s).find(a=>S.pageKey(a.href)===key);if(!again)throw e;again.scrollIntoView({block:'center',behavior:'instant'});await think(600,1200);await active(id);again.click();if(!await until(()=>inVideo()&&S.pageKey(location.href)===key&&(r=>r&&D.author(r))(videoRoot()),id,15000))throw e;}
      else await wait(2500);
      r=await postAction(c,id,videoRoot()||root,actor);
+    }
     }
     if(r.performed||r.preview)acted++;else{lastSkip=String(r.message||'').replace(/^Skipped:\s*/,'');if(/already liked/i.test(lastSkip))skippedLiked++;}
     await progress(id,acted,label+': video '+visited.size+' '+(r.performed?'done ✓':r.preview?'checked':'skipped ('+lastSkip+')')+' · '+acted+'/'+max+(name?' on this profile':''),0,visited.size,max);
@@ -213,18 +229,23 @@
   if(!acted)return {message:`Skipped ${label}: ${lastSkip||'nothing eligible'}.`};
   const extra=skippedLiked?` (${skippedLiked} already liked skipped)`:'';
   const where=name?'on @'+name:'from '+label;
-  return c.dry?{preview:true,count:acted,message:`Preview: would ${c.action==='comment'?'comment on':'like'} ${acted} video${acted===1?'':'s'} ${where}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`${verb[0].toUpperCase()+verb.slice(1)} ${acted} video${acted===1?'':'s'} ${where}${extra}.`};
+  return c.dry?{preview:true,count:acted,message:`Preview: would ${c.action==='comment'?'comment on':c.action==='follow'?'follow the authors of':'like'} ${acted} video${acted===1?'':'s'} ${where}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`${verb[0].toUpperCase()+verb.slice(1)} ${acted} video${acted===1?'':'s'} ${where}${extra}.`};
+ }
+ // Makes sure the open list shows the wanted tab (Following / Followers).
+ async function pickListTab(dialog,source){
+  const Label=source==='following'?'Following':'Followers';
+  const tab=[...dialog.querySelectorAll('div,span,button,[role="tab"]')].filter(e=>D.visible(e)&&!e.children.length&&new RegExp('^'+Label+'$','i').test(e.textContent.trim()))[0];
+  if(tab){D.press(tab.closest('[class*="TabItem"],[role="tab"]')||tab);await think(900,1500);}
  }
  // ===== Follow from a followers/following list in place: open the list, press Follow on each row, scroll for more (no profile pages are opened). =====
  async function listFollow(s,c,id,actor){
-  const owner=s.username,label=s.source+' of @'+owner,Label=s.source==='following'?'Following':'Followers';
+  const owner=s.username,label=s.source+' of @'+owner;
   if(S.profileName(location.href)?.toLowerCase()!==owner)throw Error('Profile changed; refusing to act on a different account.');
   const popup=()=>[...document.querySelectorAll('[data-e2e="follow-info-popup"]')].find(e=>D.visible(e))||D.listDialog(s.source);
   let dialog=popup();
   if(!dialog){const open=await until(()=>S.listControl(document,s.source),id,15000);if(!open)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);await think(600,1300);await active(id);D.press(open);dialog=await until(popup,id,10000);}
   if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
-  // Make sure the right tab (Following / Followers) is showing.
-  {const tab=[...dialog.querySelectorAll('div,span,button,[role="tab"]')].filter(e=>D.visible(e)&&!e.children.length&&new RegExp('^'+Label+'$','i').test(e.textContent.trim()))[0];if(tab){D.press(tab.closest('[class*="TabItem"],[role="tab"]')||tab);await think(900,1500);dialog=popup()||dialog;}}
+  await pickListTab(dialog,s.source);dialog=popup()||dialog;
   const rows=()=>{const d=popup()||dialog;return [...d.querySelectorAll('li')].map(li=>{const a=li.querySelector('a[href*="/@"]'),name=S.profileName(a?.href||'')?.toLowerCase(),btn=li.querySelector('[data-e2e="follow-button"]');return name&&btn&&D.visible(btn)?{li,name,btn}:null;}).filter(Boolean);};
   const state=b=>{const t=(b.textContent||'').trim();return /^(Following|Friends|Requested)$/i.test(t)?'done':/^Follow( back)?$/i.test(t)?'follow':'other';};
   if(!await until(()=>rows().length,id,12000))throw Error(`The ${s.source} list is empty or TikTok did not expose accounts.`);
@@ -291,6 +312,7 @@
    let dialog=D.listDialog(s.source);
    if(!dialog){const button=await until(()=>S.listControl(root,s.source),id);if(!button)throw Error(`Could not find the ${s.source} control. Open that list on the task tab and resume.`);button.click();dialog=await until(()=>D.listDialog(s.source),id);}
    if(!dialog)throw Error(`The ${s.source} dialog did not open. Open it manually and resume.`);
+   await pickListTab(dialog,s.source);dialog=D.listDialog(s.source)||dialog;
    const own=S.profileName(location.href)?.toLowerCase(),listed=()=>D.names(dialog).filter(n=>n!==own);
    if(!await until(()=>listed().length,id))throw Error('The list is empty or TikTok did not expose accounts.');
    return {users:await collect(dialog,listed,c.scanLimit,id),note:'Collected available accounts within your scan limit.'};

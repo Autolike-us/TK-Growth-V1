@@ -2,7 +2,7 @@ importScripts('selectors.js','engine.js','license-config.js','license.js');
 const base='https://www.tiktok.com/';
 let busy=false;
 // Errors raised before any click is sent; safe to retry while TikTok finishes rendering.
-const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|Cannot identify a unique video Like control/;
+const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|The first video did not open|Cannot identify a unique video Like control/;
 // Pauses that need a person (not a one-click Resume).
 const NEEDS_HUMAN=/captcha|verify|verification|restricted|Sign in|Daily cap|interrupted|restarted|unknown/i;
 const HISTORY_MAX=5000,RECEIPT_MAX_AGE=90*864e5,LOG_MAX=1500;

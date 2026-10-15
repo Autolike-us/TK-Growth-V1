@@ -8,16 +8,18 @@ const nt=window.setTimeout;window.setTimeout=(f,ms,...a)=>nt(f,Math.min(ms||0,10
 const page=({path:p,vids,arrow=true,keyNav=false,glitch=false})=>`<html lang="en"><body><a data-e2e="profile-icon" href="https://www.tiktok.com/@me">me</a><main><div id="grid">`+vids.map(v=>`<div data-e2e="channel-item" role="button" tabindex="0"><a href="https://www.tiktok.com/@${v.a}/video/${v.id}"><img src="x"></a></div>`).join('')+`</div></main>
 <script>
 window.__loc={pathname:'${p}',get href(){return 'https://www.tiktok.com'+this.pathname;}};
-var vids=${JSON.stringify(vids)},arrow=${arrow},keyNav=${keyNav},glitch=${glitch};window.posts=[];window.liked=Object.fromEntries(vids.filter(v=>v.liked).map(v=>[v.id,true]));window.clicks=0;window.arrowClicks=0;var modal=null,idx=-1,home='${p}';
+var vids=${JSON.stringify(vids)},arrow=${arrow},keyNav=${keyNav},glitch=${glitch};window.posts=[];window.liked=Object.fromEntries(vids.filter(v=>v.liked).map(v=>[v.id,true]));window.followed=Object.fromEntries(vids.filter(v=>v.followed).map(v=>[v.a,true]));window.follows=[];window.decoyClicks=0;window.clicks=0;window.arrowClicks=0;var modal=null,idx=-1,home='${p}';
 function open(i){idx=i;__loc.pathname='/@'+vids[idx].a+'/video/'+vids[idx].id;render();}
 function render(){modal?.remove();modal=document.createElement('div');modal.setAttribute('data-e2e','browse-video-container');const v=vids[idx];
- modal.innerHTML='<a data-e2e="browse-username" href="https://www.tiktok.com/@'+v.a+'">'+v.a+'</a><div class="css-1x2y3z-7937d88b--DivCommentContainer e1abc"><div class="bar"><button type="button" id="likebtn" aria-label="28 Likes" aria-pressed="'+(!!window.liked[v.id])+'"><span data-e2e="browse-like-icon"><svg></svg></span><strong>28</strong></button><button type="button" disabled><span data-e2e="browse-comment-icon"><svg></svg></span><strong>4</strong></button></div></div>'
+ modal.innerHTML='<div class="card"><a data-e2e="browse-username" href="https://www.tiktok.com/@'+v.a+'">'+v.a+'</a><button type="button" data-e2e="browse-follow" id="fbtn">'+(window.followed[v.a]?'Following':'Follow')+'</button></div><div class="suggest"><a href="https://www.tiktok.com/@zzz">zzz</a><button type="button" id="decoy">Follow</button></div><div class="css-1x2y3z-7937d88b--DivCommentContainer e1abc"><div class="bar"><button type="button" id="likebtn" aria-label="28 Likes" aria-pressed="'+(!!window.liked[v.id])+'"><span data-e2e="browse-like-icon"><svg></svg></span><strong>28</strong></button><button type="button" disabled><span data-e2e="browse-comment-icon"><svg></svg></span><strong>4</strong></button></div></div>'
   +'<div data-e2e="search-comment-container"><div data-e2e="comment-input"><div contenteditable="true" role="textbox" id="cbox"></div></div><button data-e2e="comment-post" id="post" type="button">Post</button><div id="rows"></div></div>'+(arrow&&idx<vids.length-1?'<button data-e2e="arrow-right" role="button" aria-label="Go to next video" id="nav"><svg></svg></button>':'')+'<button data-e2e="browse-close" aria-label="Close" id="close"><svg></svg></button>';
  document.body.append(modal);
  modal.querySelector('#likebtn').onclick=()=>{window.clicks++;window.liked[v.id]=true;render();};
  const nav=modal.querySelector('#nav');if(nav)nav.onclick=()=>{window.arrowClicks++;open(idx+1);};
  const cbox=modal.querySelector('#cbox');cbox.addEventListener('input',()=>{if(glitch&&!window.glitched){window.glitched=true;modal.remove();modal=null;__loc.pathname=home;}});
  modal.querySelector('#post').onclick=()=>{window.posts.push({id:v.id,text:cbox.textContent});modal.querySelector('#rows').innerHTML='<div data-e2e="comment-item"><a href="https://www.tiktok.com/@me">me</a><span>'+cbox.textContent+'</span></div>';cbox.textContent='';};
+ modal.querySelector('#fbtn').onclick=()=>{if(!window.followed[v.a]){window.followed[v.a]=true;window.follows.push(v.a);}render();};
+ modal.querySelector('#decoy').onclick=()=>{window.decoyClicks++;};
  modal.querySelector('#close').onclick=()=>{modal.remove();modal=null;__loc.pathname=home;};}
 document.addEventListener('keydown',e=>{if(keyNav&&modal&&e.key==='ArrowDown'&&idx<vids.length-1)open(idx+1);});
 document.querySelectorAll('#grid a').forEach((a,i)=>a.onclick=e=>{e.preventDefault();open(i);});
@@ -52,5 +54,13 @@ try{const ctx=await browser.newContext();
  // TikTok closing the viewer while the first character is typed: the walk re-opens that video once and carries on
  ({r,pg}=await run(page({path:'/@dabijou',vids:[{a:'dabijou',id:'71'},{a:'dabijou',id:'72'}],glitch:true}),{action:'comment',perUser:2,comment:'Great!'}));
  check('if the comment box closes mid-typing the walk re-opens the video once and still posts exactly one comment per video',r.performed&&r.count===2&&await pg.evaluate(()=>glitched&&posts.length===2&&new Set(posts.map(p=>p.id)).size===2));
+
+ // follow: press the author's Follow button in the open video (hashtag / discover page), never a suggestion's
+ const FTAG=page({path:'/tag/printify',vids:[{a:'ann',id:'501'},{a:'bob',id:'502',followed:true},{a:'ann',id:'503'},{a:'cy',id:'504'},{a:'dee',id:'505'}]});
+ const fstep={username:undefined,label:'#printify',url:'https://www.tiktok.com/tag/printify'};
+ ({r,pg}=await run(FTAG,{action:'follow',mode:'hashtag',scanLimit:5,limit:10},fstep));
+ check('follow on a hashtag presses each video author\'s Follow button in place (skipping an author already followed and a repeat) and never a suggestion\'s',r.performed&&r.count===3&&/Followed the authors of 3 videos from #printify/.test(r.message)&&await pg.evaluate(()=>JSON.stringify(follows)===JSON.stringify(['ann','cy','dee'])&&decoyClicks===0&&!document.querySelector('[data-e2e="browse-video-container"]')));
+ ({r,pg}=await run(FTAG,{action:'follow',mode:'hashtag',scanLimit:5,limit:10,dry:true},fstep));check('follow preview checks authors without pressing Follow',r.preview&&r.count===3&&await pg.evaluate(()=>follows.length===0));
+ ({r,pg}=await run(FTAG,{action:'follow',mode:'hashtag',scanLimit:5,limit:2},fstep));check('the task limit caps how many authors are followed',r.performed&&r.count===2&&await pg.evaluate(()=>JSON.stringify(follows)===JSON.stringify(['ann','cy'])));
  console.log('\n'+passed+' walk checks passed');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1);});
