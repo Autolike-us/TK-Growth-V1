@@ -69,10 +69,10 @@ const profile = AuroraSelectors.profileName(location.href);
   let wasPaused=false,wasRunning=false,lastJob=null;
   // "Target 2 of 5 · name · next in 24s", refreshed every second from the last job we saw.
   function tickNow(){
-    const job=lastJob,el=$('now');
-    const idx=job?.total?Math.min((job.finished?.length||0)+1,job.total):0,label=job?.queue?.[0]?.label;
-    if(job?.status==='running'&&label){const s=Math.max(0,Math.round(((job.nextAt||0)-Date.now())/1000));el.textContent='▶ '+(idx?'Target '+idx+' of '+job.total+' · ':'')+label+(s?' · next in '+s+'s':' · working…');el.hidden=false;}
-    else if(job?.status==='paused'&&label){el.textContent='⏸ Paused on '+(idx?'target '+idx+' of '+job.total+' · ':'')+label;el.hidden=false;}
+    const job=lastJob,el=$('now');if(!job){el.hidden=true;return;}
+    const left=job.queue?.length||0,part='\u00b7 '+(job.done||0)+'/'+(job.config?.limit||'?')+' done'+(left?' \u00b7 '+left+' step'+(left===1?'':'s')+' left':'');
+    if(job.status==='running'){const s=Math.max(0,Math.round(((job.nextAt||0)-Date.now())/1000));el.textContent='\u25b6 '+(s?'Next step in '+s+'s ':'Working\u2026 ')+part;el.hidden=false;}
+    else if(job.status==='paused'){el.textContent='\u23f8 Paused '+part;el.hidden=false;}
     else el.hidden=true;
   }
   setInterval(tickNow,1000);

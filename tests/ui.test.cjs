@@ -23,6 +23,9 @@ try{
  await job('running',false);check('Live stays selected while the task runs',!await ui.isChecked('#dry'));
  await job('completed',false);check('when the live task is done the form returns to Preview',await ui.isChecked('#dry')&&/Start preview/.test(await ui.textContent('#start')));
  await setDry(ui,false);await job('running',true);await job('completed',true);check('a finished preview run does not flip a live choice made for the next task',!await ui.isChecked('#dry'));await setDry(ui,true);
+ await ui.evaluate(()=>chrome.storage.local.set({job:{status:'running',done:1,nextAt:Date.now()+20000,config:{dry:false,limit:3,action:'like',delay:30},queue:[{},{}]}}).then(()=>render()));
+ check('Live session shows a counter and countdown while running',/1\/3 done/.test(await ui.textContent('#nowline'))&&/2 steps left/.test(await ui.textContent('#nowline'))&&/Next step in \d+s/.test(await ui.textContent('#nowline')));
+ await job('completed',true);await setDry(ui,true);
  // hiding unused fields
  await act('like');await src('users');check('Like on profiles shows posts-per-profile and source, hides comment text and discovery limit',await vis(ui,'#perUser')&&await vis(ui,'#mode')&&!await vis(ui,'#commentGroup')&&!await vis(ui,'#scanGroup'));
  await act('comment');check('Comment shows the comment box',await vis(ui,'#commentGroup')&&await vis(ui,'#perUser'));
