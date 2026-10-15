@@ -78,6 +78,8 @@
   if(!ok)throw Error('Action was sent but could not be confirmed. It will not be automatically repeated. Check TikTok.');
   await receipt(key,'confirmed');return {performed:true,message};
  }
+// What the page looks like right now (for error reports): address, any dialog text, and the visible data-e2e names.
+ const snapshot=()=>{try{const e2e=[...new Set([...document.querySelectorAll('[data-e2e]')].filter(e=>D.visible(e)).map(e=>e.getAttribute('data-e2e')))].slice(0,22).join(',');const dlg=[...document.querySelectorAll('[role="dialog"]')].filter(e=>D.visible(e)).map(e=>(e.innerText||'').replace(/\s+/g,' ').slice(0,50)).slice(0,2).join(' | ');return `path ${location.pathname}; dialogs: ${dlg||'none'}; visible: ${e2e}`.slice(0,420);}catch{return 'no snapshot';}};
  async function postAction(c,id,root,actor){
   const urlAuthor=new URL(S.postURL(location.href)||location.href).pathname.split('/')[1].slice(1).toLowerCase();
   const author=await until(()=>D.author(root)||(D.names(root).includes(urlAuthor)?urlAuthor:null),id);T('author found',!!author);
@@ -129,9 +131,9 @@
    const recover=async()=>{const btns=D.commentsButtons(live());const open=btns[0];const st=b=>b?`${b.getAttribute('aria-pressed')||b.getAttribute('aria-expanded')||'-'}`:'none';
     for(let a=0;a<5&&open;a++){T('comment box lost; toggling the comments icon, try',a+1,'icons',btns.length,'state',st(open),probe());D.press(open);const f=await until(findField,id,2500);if(f)return f;}return null;};
    await typeHuman(want,id,async ch=>{
-    let f=findField();if(!f){await wait(500);f=findField();}
+    let f=findField();if(!f){for(let k=0;k<8&&!f;k++){await wait(500);f=findField();}}
     if(!f&&recoveries<3){recoveries++;f=await recover();if(f){await wait(600);f=findField()||f;const now=D.fieldText(f).trim();if(now&&now!==typed){f.focus();if('value' in f)f.value='';else{document.execCommand('selectAll');document.execCommand('delete');}}if(D.fieldText(f).trim()!==typed)for(const x of typed)D.typeChar(f,x);T('comment box restored',recoveries);}}
-    if(!f){T('comment box gone',probe());throw Error('The comment box disappeared while typing. Nothing was submitted.');}
+    if(!f){T('comment box gone',probe(),snapshot());throw Error('The comment box disappeared while typing. Nothing was submitted. ['+snapshot()+']');}
     D.typeChar(f,ch);typed+=ch;
     if(typed.length===1){await wait(500);T('after the first character, box present',!!findField(),location.pathname);}
    });
@@ -176,7 +178,7 @@
   T('walk',label,'tiles',tilesOf(s).length,'max',max);await progress(id,0,label+': opening the first video…');
   tile.scrollIntoView({block:'center',behavior:'instant'});await think(700,1500);await active(id);tile.click();
   if(!await until(()=>{if(!inVideo())return false;const r=videoRoot();return r&&D.author(r);},id,15000))throw Error('The first video did not open. Check the task tab and resume.');
-  let acted=0,lastSkip='',skippedLiked=0;const visited=new Set();
+  let acted=0,lastSkip='',skippedLiked=0;const visited=new Set(),retried=new Set();
   try{
    for(let i=0;i<max*4+6&&acted<max;i++){
     await active(id);
@@ -184,7 +186,16 @@
     await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action!=='like'||D.likeCandidates(r).length);},id,12000);
     const root=videoRoot();if(!root)throw Error('Lost the open video. Check the task tab and resume.');
     T('walk video',key);await progress(id,acted,label+': video '+visited.size+' — '+(c.dry?'checking':c.action==='comment'?'commenting':'liking')+'…',0,visited.size,max);
-    const r=await postAction(c,id,root,actor);
+    let r;
+    try{r=await postAction(c,id,root,actor);}
+    catch(e){
+     if(c.action!=='comment'||!/comment box disappeared/.test(String(e.message))||retried.has(key))throw e;
+     retried.add(key);T('comment box lost: re-opening this video once');await progress(id,acted,label+': video '+visited.size+' — the comment box closed, re-opening…',0,visited.size,max);
+     await think(1500,2500);
+     if(!inVideo()||S.pageKey(location.href)!==key){const again=tilesOf(s).find(a=>S.pageKey(a.href)===key);if(!again)throw e;again.scrollIntoView({block:'center',behavior:'instant'});await think(600,1200);await active(id);again.click();if(!await until(()=>inVideo()&&S.pageKey(location.href)===key&&(r=>r&&D.author(r))(videoRoot()),id,15000))throw e;}
+     else await wait(2500);
+     r=await postAction(c,id,videoRoot()||root,actor);
+    }
     if(r.performed||r.preview)acted++;else{lastSkip=String(r.message||'').replace(/^Skipped:\s*/,'');if(/already liked/i.test(lastSkip))skippedLiked++;}
     await progress(id,acted,label+': video '+visited.size+' '+(r.performed?'done ✓':r.preview?'checked':'skipped ('+lastSkip+')')+' · '+acted+'/'+max+(name?' on this profile':''),0,visited.size,max);
     if(acted>=max)break;
