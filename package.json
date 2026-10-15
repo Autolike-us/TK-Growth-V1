@@ -8,6 +8,7 @@
     "test:browser": "python tests/browser_smoke.py",
     "test:walk": "node tests/walk.test.cjs",
     "package": "node scripts/package.cjs",
+    "package:dev": "node scripts/package.cjs --dev",
     "test:license-ui": "node tests/license_ui.test.cjs"
   }
 }
