@@ -12,7 +12,7 @@ test('follows route profiles to account steps',()=>assert.equal(E.initial(config
 test('likes route profiles to discovery steps',()=>assert.equal(E.initial(config())[0].kind,'posts'));
 test('unfollow requires explicit targets',()=>{for(const mode of ['posts','hashtag','followers','following','commenters'])assert.throws(()=>config({action:'unfollow',mode}));});
 test('unsupported discovery and filters fail validation',()=>{for(const mode of ['location','likers','unknown'])assert.throws(()=>config({mode}));assert.throws(()=>config({maxAge:1}));assert.throws(()=>config({videos:true}));});
-test('limits reject unsafe or noninteger values',()=>{for(const delay of [0,29,30.5,Infinity])assert.throws(()=>config({delay}));assert.throws(()=>config({limit:0}));assert.throws(()=>config({scanLimit:501}));});
+test('limits reject unsafe or noninteger values',()=>{for(const delay of [0,4,5.5,Infinity])assert.throws(()=>config({delay}));assert.throws(()=>config({limit:0}));assert.throws(()=>config({scanLimit:501}));});
 test('comment requires 1 through 150 characters',()=>{assert.throws(()=>config({action:'comment',comment:''}));assert.throws(()=>config({action:'comment',comment:'x'.repeat(151)}));assert.equal(config({action:'comment',comment:' hello '}).comment,'hello');});
 test('hashtag discovery uses TikTok tag page',()=>{for(const target of ['#travel','https://www.tiktok.com/tag/travel'])assert.equal(E.initial(config({mode:'hashtag',target}))[0].url,'https://www.tiktok.com/tag/travel');});
 test('followers and following retain selected source',()=>{for(const mode of ['followers','following']){const step=E.initial(config({mode}))[0];assert.equal(step.source,mode);assert.equal(step.url,'https://www.tiktok.com/@alice');}});

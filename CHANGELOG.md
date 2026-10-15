@@ -1,10 +1,13 @@
 # Changelog
 
 ## 1.0.0
+- Pace floor lowered to 5 seconds between steps (default 20).
+- Preview works without a license; only live tasks need a key. The trial (3 days, no subscription or payment method) is advertised in the License box.
+- "Report an issue" and "Contact us" open an email to support@getaurorastudios.com (the issue report copies the diagnostic report for you to paste).
 - First public release, sold through getaurorastudios.com. Version numbering restarts at 1.0.0; everything listed below is included. The studio now enforces the license (3-day free trial, then a subscription) against https://getaurorastudios.com.
 
 ## 1.8.0
-- License system (for selling Aurora): a License box in the studio/popup where the customer pastes their key; Start/Resume/every step are blocked without a valid trial or subscription; the on-page panel locks Preview too. License tokens are signed (ES256) by the Aurora website and checked offline; they refresh every 12 hours and work for up to 72 hours offline. Builds stay unlocked until you run `node scripts/configure-license.cjs --api https://your-site --jwk '{…public key…}'`, and `npm run package` refuses to build an unlocked zip (use `--dev` for a test build).
+- License system (for selling Aurora): a License box in the studio/popup where the customer pastes their key; live tasks (Start/Resume/every step) are blocked without a valid trial or subscription, while Preview works without a key. License tokens are signed (ES256) by the Aurora website and checked offline; they refresh every 12 hours and work for up to 72 hours offline. Builds stay unlocked until you run `node scripts/configure-license.cjs --api https://your-site --jwk '{…public key…}'`, and `npm run package` refuses to build an unlocked zip (use `--dev` for a test build).
 
 ## 1.7.0
 - The panel and the Live session card show the same progress line on every site: "Target 2 of 5 · @name · post 2/3 · next post in 24s · 1/9 done", a finished/current/upcoming target list, and a "Skip this target & continue" button when paused.
