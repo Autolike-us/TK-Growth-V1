@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.0
+- First public release, sold through getaurorastudios.com. Version numbering restarts at 1.0.0; everything listed below is included. The studio now enforces the license (3-day free trial, then a subscription) against https://getaurorastudios.com.
+
 ## 1.8.0
 - License system (for selling Aurora): a License box in the studio/popup where the customer pastes their key; Start/Resume/every step are blocked without a valid trial or subscription; the on-page panel locks Preview too. License tokens are signed (ES256) by the Aurora website and checked offline; they refresh every 12 hours and work for up to 72 hours offline. Builds stay unlocked until you run `node scripts/configure-license.cjs --api https://your-site --jwk '{…public key…}'`, and `npm run package` refuses to build an unlocked zip (use `--dev` for a test build).
 

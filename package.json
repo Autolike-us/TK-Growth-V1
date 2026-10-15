@@ -1,6 +1,6 @@
 {
   "name": "aurora-tiktok-studio",
-  "version": "1.8.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "test": "node tests/planning.test.cjs && node tests/worker.test.cjs && node tests/report.test.cjs && node tests/license.test.cjs",

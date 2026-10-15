@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Aurora \u2022 TikTok Studio",
-  "version": "1.8.0",
+  "name": "Aurora • TikTok Studio",
+  "version": "1.0.0",
   "description": "Personal TikTok discovery, likes, follows, unfollows and comments with preview and local history.",
   "permissions": [
     "storage",
@@ -12,7 +12,8 @@
     "scripting"
   ],
   "host_permissions": [
-    "https://www.tiktok.com/*"
+    "https://www.tiktok.com/*",
+    "https://getaurorastudios.com/*"
   ],
   "background": {
     "service_worker": "background.js"
