@@ -1,8 +1,8 @@
-importScripts('selectors.js','engine.js');
+importScripts('selectors.js','engine.js','license-config.js','license.js');
 const base='https://www.tiktok.com/';
 let busy=false;
 // Errors raised before any click is sent; safe to retry while TikTok finishes rendering.
-const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|Cannot identify a unique video Like control/;
+const RETRYABLE=/did not render this page|Cannot verify the rendered profile|No posts appeared|Cannot identify this post author|Cannot verify the video author|Could not find the|dialog did not open|The first video did not open|Cannot identify a unique video Like control/;
 // Pauses that need a person (not a one-click Resume).
 const NEEDS_HUMAN=/captcha|verify|verification|restricted|Sign in|Daily cap|interrupted|restarted|unknown/i;
 const HISTORY_MAX=5000,RECEIPT_MAX_AGE=90*864e5,LOG_MAX=1500;
@@ -68,6 +68,7 @@ async function tick(){
  try{
   const {job}=await chrome.storage.local.get('job');if(job?.status!=='running')return;
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
+  if(job.config.dry===false){const lic=await AuroraLicense.check();if(!lic.allowed)throw Error('License: '+lic.message);}
   if(job.inFlight)throw Error('The last action was interrupted and its outcome is unknown. Check TikTok manually, stop this task, and create a new task for remaining targets.');
   if(Date.now()<(job.nextAt||0)){await schedule(job);return;}
   const step=job.queue[0];let tab;try{tab=await chrome.tabs.get(job.tabId);}catch{throw Error('The task tab was closed. Resume to open a new tab.');}
@@ -76,24 +77,24 @@ async function tick(){
    if(job.navigation?.target===step.url&&job.navigation.attempts>=2)throw Error('TikTok redirected away from this target. Check the task tab and resume; Aurora stopped retrying the URL.');
    job.navigation={target:step.url,attempts:job.navigation?.target===step.url?job.navigation.attempts+1:1};job.message='Opening '+step.url;job.nextAt=Date.now()+2000;await save(job);await dlog('info','Opening '+short(step.url)+(job.navigation.attempts>1?` (attempt ${job.navigation.attempts})`:''));await chrome.tabs.update(job.tabId,{url:step.url,active:true});await schedule(job);return;
   }
-  const action=['account','engage'].includes(step.kind)&&!job.config.dry;
-  if(action&&job.config.dailyCap&&await dailyCount()>=job.config.dailyCap)throw Error(`Daily cap reached (${job.config.dailyCap} actions today). Resume tomorrow or raise the cap in the studio.`);
+  const action=['account','engage','walk','listfollow'].includes(step.kind)&&!job.config.dry;let room=null;
+  if(action&&job.config.dailyCap){const used=await dailyCount();if(used>=job.config.dailyCap)throw Error(`Daily cap reached (${job.config.dailyCap} actions today). Resume tomorrow or raise the cap in the studio.`);room=job.config.dailyCap-used;}
   job.navigation=null;job.message='Reading TikTok: '+step.kind;await save(job);
   if(action){job.inFlight=true;await save(job);}
   await dlog('info',`Step ${step.kind} ${short(step.url)}${job.config.dry?' [preview]':''}`);
-  const r=await sendStep(job,step);
+  const r=await sendStep(job,['walk','listfollow'].includes(step.kind)?{...step,done:job.done||0,room}:step);
   const latest=(await chrome.storage.local.get('job')).job;if(latest?.id!==job.id||latest.status!=='running')return;
   job.inFlight=false;await save(job);
   if(r?.error&&RETRYABLE.test(r.error)&&(job.retries||0)<3){job.retries=(job.retries||0)+1;job.message=`TikTok was still loading (${r.error}) Retrying ${job.retries}/3…`;job.nextAt=Date.now()+8000;await save(job);await dlog('warn',`Retry ${job.retries}/3 after: ${r.error}`,ctx(r));await schedule(job);return;}
   if(r?.error){await dlog('error','Step failed: '+r.error,ctx(r));throw Error(r.error);}if(!r)throw Error('TikTok returned no result.');
   job.retries=0;
   if(r.wait){job.message=r.wait;job.nextAt=Date.now()+3000;await save(job);await schedule(job);return;}
-  job.queue.shift();const more=AuroraEngine.expand(job,step,r);job.queue.unshift(...more);
+  try{await chrome.storage.local.remove('walk');}catch{}job.queue.shift();const more=AuroraEngine.expand(job,step,r);job.queue.unshift(...more);
   // Targets finished so far (for "Target 2 of 5"); a discovery step is replaced by the targets it found.
-  if(['walk','account','engage'].includes(step.kind))closeStep(job,step,r);else job.total=Math.max((job.finished?.length||0),(job.total||0)-1+more.length);
+  if(['walk','account','engage','listfollow'].includes(step.kind))closeStep(job,step,r);else job.total=Math.max((job.finished?.length||0),(job.total||0)-1+more.length);
   let gap=quick();
   if(['users','posts','author'].includes(step.kind))job.message=`Discovered ${more.length} ${step.kind==='posts'?'posts':'profiles'}. ${r.note||''}`;
-  else{if(r.performed||r.preview){gap=pause(job);job.done=(job.done||0)+1;if(r.performed){job.counts[job.config.action]++;await bumpDaily();}else job.previewed++;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
+  else{if(r.performed||r.preview){const n=['walk','listfollow'].includes(step.kind)?Math.max(1,r.count||1):1;gap=pause(job);job.done=(job.done||0)+n;if(r.performed){job.counts[job.config.action]+=n;for(let i=0;i<n;i++)await bumpDaily();}else job.previewed+=n;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
   await log(job.message,step.url);await dlog('info','→ '+job.message,/^Skipped/.test(job.message||'')?ctx(r):undefined);
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
   job.nextAt=Date.now()+gap;await save(job);await schedule(job);
@@ -109,6 +110,7 @@ async function taskTab(url){
 }
 async function resumeTask(){
  const {job}=await chrome.storage.local.get('job');if(!job)throw Error('Create a task first.');
+ if(job.config?.dry===false){const lic=await AuroraLicense.check();if(!lic.allowed)throw Error(lic.message);}
  if(job.inFlight)throw Error('Interrupted action: check TikTok manually, then stop this task and create a new task for remaining targets.');
  if(job.version!==2)throw Error('Stop the old-version task and create a new task.');if(job.status!=='paused')throw Error('Only paused tasks can resume.');
  try{await chrome.tabs.get(job.tabId);}catch{job.tabId=(await chrome.tabs.create({url:job.queue[0]?.url||base})).id;}
@@ -131,9 +133,10 @@ chrome.runtime.onMessage.addListener((m,s,respond)=>{
  if(s.id!==chrome.runtime.id||(!ownPage&&!panel)){respond({ok:false,error:'Dashboard commands only.'});return;}
  (async()=>{
   if(m.action==='openStudio'){await chrome.tabs.create({url:chrome.runtime.getURL('dashboard.html')});return{ok:true};}
-  if(m.action==='previewProfile')m={action:'start',config:{action:'like',mode:'users',target:m.target,perUser:3,limit:3,scanLimit:3,delay:30,maxAge:0,dailyCap:0,exclude:'',dry:true,videos:false}};
+  if(m.action==='previewProfile')m={action:'start',config:{action:'like',mode:'users',target:m.target,perUser:3,limit:3,scanLimit:3,delay:20,maxAge:0,dailyCap:0,exclude:'',dry:true,videos:false}};
   if(m.action==='save'){await chrome.storage.local.set({config:m.config});return{ok:true};}
   if(m.action==='start'){
+   if(m.config?.dry===false){const lic=await AuroraLicense.check();if(!lic.allowed)throw Error(lic.message);}
    if(busy)throw Error('A step is finishing. Try again shortly.');const old=(await chrome.storage.local.get('job')).job;if(['running','paused'].includes(old?.status))throw Error('Stop the current task first.');
    const config=AuroraEngine.config(m.config),queue=AuroraEngine.initial(config);if(!queue.length)throw Error('All targets are excluded.');
    await chrome.storage.local.set({config:m.config});const tab=await taskTab(queue[0].url);

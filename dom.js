@@ -30,7 +30,9 @@ globalThis.AuroraDOM={
   try{const el=document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');const u=JSON.parse(el?.textContent||'null')?.['__DEFAULT_SCOPE__']?.['webapp.app-context']?.user?.uniqueId;return /^[\w.]{1,30}$/.test(u||'')?u.toLowerCase():null;}catch{return null;}
  },
  likeCandidates(root){const q='[data-e2e="browse-like-icon"],[data-e2e="like-icon"],[aria-label^="Like video"],[aria-label^="Unlike video"],[aria-label^="Undo like"],[aria-label^="like video" i]';const heart=r=>[...r.querySelectorAll('svg path')].filter(p=>/^M7\.5 2\.25c3 0 4\.5 2/.test(p.getAttribute('d')||'')).map(p=>p.closest('svg'));
-  const notComment=e=>!e.closest('[data-e2e*="comment"],[class*="CommentItem"],[class*="DivComment"]');
+  // The video's own like icon is accepted wherever it sits (TikTok's side panel is built from "comment" containers); it only has to be outside a real comment row.
+  const own=e=>!!e.matches?.('[data-e2e="browse-like-icon"],[data-e2e="like-icon"]');const inRow=e=>!!e.closest('[data-e2e="comment-item"],[data-e2e="comment-level-1"],[data-e2e="comment-level-2"],[class*="CommentItem"]');
+  const notComment=e=>own(e)?!inRow(e):!e.closest('[data-e2e*="comment"],[class*="CommentItem"],[class*="DivComment"]');
   const find=r=>[...new Set([...r.querySelectorAll(q),...heart(r)].filter(this.visible).filter(notComment).map(e=>e.closest('button,[role="button"]')||(e.tagName.toLowerCase()==='svg'?e.parentElement:e)))];let c=find(root);if(!c.length&&root!==document)c=find(document);return c;},
  inView(e){const r=e.getBoundingClientRect();const cy=r.top+r.height/2,cx=r.left+r.width/2;return cy>0&&cy<innerHeight&&cx>0&&cx<innerWidth;},
  likeButton(root,author){let c=this.likeCandidates(root);if(c.length>1)c=c.filter(e=>this.inView(e));

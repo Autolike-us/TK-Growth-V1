@@ -1,11 +1,15 @@
 {
   "name": "aurora-tiktok-studio",
-  "version": "1.7.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test": "node tests/planning.test.cjs && node tests/worker.test.cjs && node tests/report.test.cjs",
+    "test": "node tests/planning.test.cjs && node tests/worker.test.cjs && node tests/report.test.cjs && node tests/license.test.cjs",
     "test:ui": "node tests/ui.test.cjs",
     "test:browser": "python tests/browser_smoke.py",
-    "package": "node scripts/package.cjs"
+    "test:walk": "node tests/walk.test.cjs",
+    "test:listfollow": "node tests/listfollow.test.cjs",
+    "package": "node scripts/package.cjs",
+    "package:dev": "node scripts/package.cjs --dev",
+    "test:license-ui": "node tests/license_ui.test.cjs"
   }
 }

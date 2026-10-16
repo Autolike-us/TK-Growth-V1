@@ -48,7 +48,7 @@ try{
  await ui.selectOption('#presetList','Morning likes');await ui.waitForTimeout(100);check('the setup summary line appears',/target/.test(await ui.textContent('#presetInfo')));
  // summary, sections, ctrl+enter
  await act('like');await src('users');await ui.fill('#target','alice, bob');
- const sum=await ui.textContent('#startSummary');check('summary line shows mode, action, target count, per-target posts and pace',/PREVIEW/.test(sum)&&/Like 2 targets/.test(sum)&&/up to 3 each/.test(sum)&&/every ~30s/.test(sum));
+ const sum=await ui.textContent('#startSummary');check('summary line shows mode, action, target count, per-target posts and pace',/PREVIEW/.test(sum)&&/Like 2 targets/.test(sum)&&/up to 3 each/.test(sum)&&/every ~20s/.test(sum));
  await setDry(ui,false);check('summary flips to LIVE',/LIVE/.test(await ui.textContent('#startSummary')));await setDry(ui,true);
  check('Pace & limits and Advanced start collapsed with captions',!await ui.evaluate(()=>document.getElementById('secPace').open)&&/limit 10/.test(await ui.textContent('#paceSum'))&&/none set/.test(await ui.textContent('#advSum')));
  await ui.click('#secPace>summary');check('opening a section is remembered',await ui.evaluate(async()=>{await new Promise(r=>setTimeout(r,150));return (await chrome.storage.local.get('ui')).ui.secPace===true;}));
