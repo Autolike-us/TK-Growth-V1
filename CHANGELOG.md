@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1
+- New: Telegram channel "Aurora Studios Report" for bug reports, feature requests and ideas — linked in the footer of the studio and the toolbar popup (next to Report an issue and Contact us).
+
 ## 1.0.0
 - Likes and comments now walk in place, like Facebook and Instagram: open the first video of a profile (or a hashtag / discover page such as /discover/printify-como-funciona-en-mexico), act, press TikTok's next-video arrow (Down key as a fallback), repeat. No more opening every video as its own page.
 - Follow on a hashtag or discover page now follows each video's author in place (the Follow button in the open video), instead of opening every video and then every profile. Repeated authors and people you already follow are skipped.
