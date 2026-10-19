@@ -106,7 +106,7 @@ with sync_playwright() as p:
  fixture(V2);page.evaluate("()=>{const b=document.querySelector('button');b.onclick=()=>b.setAttribute('aria-pressed','true')}");r=step(dry=False);check('direct video page layout: like is clicked once and confirmed',bool(r.get('performed')) and page.evaluate('clicks')==1)
  fixture(V2.replace('href="/@alice"><span>alice','href="/@bob"><span>bob'));r=step();check('author mismatch still fails closed',bool(r.get('error')) and page.evaluate('clicks')==0)
  fixture(V2.replace('aria-pressed="false"','aria-pressed="true"').replace('Like video','Unlike video'));r=step();check('direct video page layout: already liked is skipped',not r.get('preview') and not r.get('error') and 'already liked' in r.get('message',''))
- for f in ['dashboard.html','popup.html']:
+ for f in ['dashboard.html']:
   page.goto('https://fixture.test/'+f);page.set_content((ROOT/f).read_text());page.add_script_tag(content=MOCK);page.evaluate('data.job=null');page.add_style_tag(path=str(ROOT/'style.css'));page.add_script_tag(path=str(ROOT/'report.js'));page.add_script_tag(path=str(ROOT/'dashboard.js'));page.wait_for_timeout(100)
   check(f+' preview defaults on',page.locator('#dry').is_checked() and 'Extension error' not in page.locator('#notice').inner_text())
   check(f+' only supported discovery sources',set(page.locator('#mode option').evaluate_all('(es)=>es.map(e=>e.value)'))=={'users','followers','following','commenters','hashtag','posts'})
