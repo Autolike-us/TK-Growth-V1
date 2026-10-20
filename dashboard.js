@@ -1,4 +1,4 @@
-const $=id=>document.getElementById(id); const fields=['action','comment','scanLimit','mode','target','perUser','limit','delay','maxAge','dailyCap','exclude','dry','videos'];
+const $=id=>document.getElementById(id); const fields=['action','comment','commentMany','scanLimit','mode','target','perUser','limit','delay','maxAge','dailyCap','exclude','dry','videos'];
 const hints={users:'Separate usernames with commas or new lines.',followers:'One username. Loads available accounts from the follower dialog up to the discovery limit.',following:'One username. Loads available accounts from the following dialog up to the discovery limit.',commenters:'Paste a TikTok video or photo URL. Discovers currently rendered commenters.',hashtag:'Enter one #hashtag, its TikTok /tag/ URL, or a TikTok discover page link.',posts:'Paste TikTok video or photo URLs, separated by commas or new lines.'};
 function settings(){return Object.fromEntries(fields.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value]));}
 let licenseOk=true,jobActive=false;const canRun=()=>licenseOk||$('dry').checked,refreshStart=()=>{$('start').disabled=jobActive||!canRun();};
@@ -6,12 +6,13 @@ function notice(s){$('notice').textContent=s;}
 async function send(action,data={}){try{const r=await chrome.runtime.sendMessage({action,...data});if(!r?.ok)throw Error(r?.error||'No response');notice(r.message||'Saved.');await render();return true;}catch(e){notice(e.message);return false;}}
 const DISCOVERY=['followers','following','commenters','likers','hashtag','location'],PROFILE_POSTS=['users','followers','following','commenters','likers'];
 function updateForm(){
- const action=$('action').value,unfollow=action==='unfollow',post=['like','comment'].includes(action);
+ const action=$('action').value,unfollow=action==='unfollow',post=['like','comment','followlike'].includes(action);
  for(const option of $('mode').options)option.disabled=unfollow&&option.value!=='users';
  if(unfollow)$('mode').value='users';
  const mode=$('mode').value;
  $('commentGroup').hidden=action!=='comment';$('comment').required=action==='comment';
- $('actionHint').textContent=({like:'Likes eligible videos. Preview first.',follow:'Follows discovered accounts, or the authors of discovered videos.',unfollow:'Only usernames you explicitly enter will be unfollowed.',comment:'Posts your exact comment on eligible videos. Preview first.'})[action];
+ {const cm=$('comment'),many=$('commentMany').checked;cm.dataset.max=cm.dataset.max||cm.maxLength;cm.maxLength=many?6000:+cm.dataset.max;cm.placeholder=many?'One comment per line — for example:\nLove this!\nSuch a great shot\nThanks for sharing':'Write the exact comment you want posted';const h=$('commentGroup').querySelector('.hint');h.dataset.one=h.dataset.one||h.textContent;h.textContent=many?'Each post gets one of the comments above (one per line), chosen at random. Aurora still attempts at most one comment per post.':h.dataset.one;}
+ $('actionHint').textContent=({like:'Likes eligible videos. Preview first.',follow:'Follows discovered accounts, or the authors of discovered videos.',followlike:'Follows each account and likes its videos. From a list of videos (hashtag or links) it likes each video and follows its author.',unfollow:'Only usernames you explicitly enter will be unfollowed.',comment:'Posts your exact comment on eligible videos. Preview first.'})[action];
  $('hint').textContent=unfollow?'Exact usernames you already follow, separated by commas or new lines.':hints[mode];
  // Hide what this action and source do not use (values are kept, so switching back restores them).
  document.querySelector('label[for="mode"]').hidden=unfollow;$('mode').hidden=unfollow;
@@ -25,7 +26,7 @@ function updateForm(){
  paintMode();
  $('target').placeholder=({hashtag:'#travel, a hashtag URL or a discover link',posts:'Video URLs',commenters:'A video URL'})[mode]||'@username, one or more usernames';
 }
-$('mode').onchange=()=>{disarm();updateForm();};$('action').onchange=()=>{disarm();updateForm();rememberForm();};
+$('mode').onchange=()=>{disarm();updateForm();};$('commentMany').addEventListener('change',()=>{disarm();updateForm();});$('action').onchange=()=>{disarm();updateForm();rememberForm();};
 let armed=null;
 const startLabel=()=>$('dry').checked?'✦ Start preview':'✦ Start live task';
 function disarm(){clearTimeout(armed);armed=null;$('start').textContent=startLabel();}
@@ -44,8 +45,8 @@ function paintMode(){
 $('dry').addEventListener('change',()=>{disarm();paintMode();refreshStart();});
 $('task').onsubmit=async e=>{e.preventDefault();if(!canRun()){notice('Live tasks need a license key. Preview works without one — or add your key above (free 3-day trial, no card needed).');$('licKey')?.focus();return;}const config=settings();
  if(!config.dry&&!armed){
-  $('start').textContent='⚠ Confirm live '+config.action+' task';
-  notice('Live mode: this will really '+config.action+' (limit '+config.limit+', target: '+config.target+(config.action==='comment'?', comment: '+config.comment:'')+'). Click the button again within 15 seconds to confirm, or tick Preview only to cancel.');
+  $('start').textContent='⚠ Confirm live '+(config.action==='followlike'?'follow + like':config.action)+' task';
+  notice('Live mode: this will really '+(config.action==='followlike'?'follow and like':config.action)+' (limit '+config.limit+', target: '+config.target+(config.action==='comment'?', comment: '+(config.commentMany?'a different one of your '+String(config.comment).split(/\r?\n/).filter(x=>x.trim()).length+' comments on each post':config.comment):'')+'). Click the button again within 15 seconds to confirm, or tick Preview only to cancel.');
   armed=setTimeout(()=>{disarm();notice('Live confirmation expired. Nothing was started.');},15000);return;
  }
  disarm();$('start').disabled=true;notice('Starting… opening your TikTok task tab.');const ok=await send('start',{config});await render();
@@ -104,14 +105,14 @@ try{document.querySelectorAll('header .badge').forEach(b=>{b.textContent='✦ v'
 // ================= Navigation upgrades =================
 const ui={};
 function saveUi(){try{chrome.storage.local.set({ui}).catch(()=>{});}catch{}}
-const ACTION_NAMES={like:'Like',follow:'Follow',unfollow:'Unfollow',comment:'Comment on'};
+const ACTION_NAMES={like:'Like',follow:'Follow',followlike:'Follow + like',unfollow:'Unfollow',comment:'Comment on'};
 const targetList=()=>[...new Set($('target').value.split(/[,\n]+/).map(s=>s.trim()).filter(Boolean))];
 
 // ---- one-line summary above Start, plus the collapsed-section captions ----
 function paintSummary(){
  const dry=$('dry').checked,action=$('action').value,mode=$('mode').value,n=targetList().length;
  const perUser=Number($('perUser').value)||1,limit=Number($('limit').value)||1,delay=Number($('delay').value)||20,cap=Number($('dailyCap').value)||0;
- const post=['like','comment'].includes(action),perTarget=post&&PROFILE_POSTS.includes(mode),discover=action!=='unfollow'&&DISCOVERY.includes(mode);
+ const post=['like','comment','followlike'].includes(action),perTarget=post&&PROFILE_POSTS.includes(mode),discover=action!=='unfollow'&&DISCOVERY.includes(mode);
  const steps=n?Math.min(limit,perTarget&&!discover?n*perUser:discover?limit:n):0,secs=Math.round(steps*delay*1.2+n*6);
  const eta=!steps?'':secs<100?'about 1–2 min':'about '+Math.round(secs/60)+' min';
  const el=$('startSummary');el.className='summary '+(dry?'is-preview':'is-live');el.textContent='';

@@ -125,12 +125,12 @@
    T('comment dom',probe());
    const field=findField();T('comment box found',!!field);
    if(!field)return {message:'Skipped: comments are disabled or the comment field is unavailable.'};
-   if(c.dry)return {preview:true,message:`Preview comment: ${c.comment}. Nothing posted.`};
+   if(c.dry)return {preview:true,message:`Preview comment: ${c.commentMany?'one of your '+c.commentList.length+' comments (a different one on each post)':c.comment}. Nothing posted.`};
    if(!actor)throw Error('Cannot identify the signed-in account. Refresh TikTok.');
    const key=`${actor}:comment:${S.pageKey(location.href)}`;
    const {receipts={}}=await chrome.storage.local.get('receipts');if(receipts[key])return {message:'Skipped: Aurora already attempted a comment on this post. No duplicate sent.'};
    if(D.fieldText(field).trim())throw Error('The comment box already contains text. Clear it manually before resuming.');
-   const want=c.comment.replace(/\s*[\r\n]+\s*/g,' ').trim();
+   const want=(c.commentMany?await AuroraComments.pick(c,key):c.comment).replace(/\s*[\r\n]+\s*/g,' ').trim();
    const ownComment=()=>[...D.commentRows(live()),...D.commentRows(document)].some(row=>D.names(row)[0]===actor&&row.textContent.includes(want));
    if(ownComment())return {message:'Skipped: your comment is already visible.'};
    await active(id);await think(500,1400);

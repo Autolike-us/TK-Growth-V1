@@ -24,7 +24,7 @@ with sync_playwright() as p:
  page=context.new_page()
  def fixture(body,url=URL,actor=True):
   page.goto(url);page.set_content((NAV if actor else '')+body);page.add_script_tag(content=MOCK)
-  for f in ['selectors.js','dom.js','content.js']:page.add_script_tag(path=str(ROOT/f))
+  for f in ['selectors.js','dom.js','comments.js','content.js']:page.add_script_tag(path=str(ROOT/f))
  def step(action='like',dry=True,kind='engage',url=URL,**extra):
   c=dict(action=action,dry=dry,mode='posts',exclude=[],maxAge=0,videos=False,scanLimit=2,perUser=2,comment='Nice video!');c.update(extra)
   return page.evaluate('''arg=>new Promise(resolve=>listeners[0]({action:'step',step:{kind:arg.kind,url:arg.url,username:'alice'},config:arg.c,jobId:'test'},{id:'extension'},resolve))''',dict(kind=kind,url=url,c=c))
@@ -42,6 +42,19 @@ with sync_playwright() as p:
  fixture(VIDEO);page.locator('textarea').fill('existing draft');r=step(action='comment',dry=False);check('existing draft preserved',bool(r.get('error')) and page.locator('textarea').input_value()=='existing draft' and page.evaluate('clicks')==0)
  fixture(VIDEO);page.evaluate("data.receipts['me:comment:video:123']={status:'attempted'}");r=step(action='comment',dry=False);check('uncertain comment is not resent',not r.get('performed') and page.locator('textarea').input_value()=='' and page.evaluate('clicks')==0)
  fixture(VIDEO);page.evaluate('''()=>{document.querySelector('[data-e2e=comment-post]').onclick=()=>{const t=document.querySelector('textarea');const row=document.createElement('div');row.dataset.e2e='comment-item';row.innerHTML='<a href="/@me">me</a><p></p>';row.querySelector('p').textContent=t.value;document.querySelector('main').append(row);t.value='';}}''');r=step(action='comment',dry=False);check('comment requires own rendered receipt',r.get('performed') and page.evaluate('clicks')==1)
+
+ # comment variants: a different comment on each video. Never repeats until all were used; the next round does not start with the comment just used.
+ WIRE="""()=>{document.querySelector('[data-e2e=comment-post]').onclick=()=>{const t=document.querySelector('textarea');const row=document.createElement('div');row.dataset.e2e='comment-item';row.innerHTML='<a href="/@me">me</a><p></p>';row.querySelector('p').textContent=t.value;document.querySelector('main').append(row);t.value='';}}"""
+ used=[];keep=None
+ for n in range(1,5):
+  vurl='https://www.tiktok.com/@alice/video/90%d'%n
+  fixture(VIDEO,vurl);page.evaluate(WIRE)
+  if keep is not None:page.evaluate('u=>{data.commentUse=u}',keep)
+  r=step(action='comment',dry=False,url=vurl,comment='alpha\nbeta\ngamma',commentMany=True,commentList=['alpha','beta','gamma'],commentSeed='seed-1')
+  rows=page.evaluate("document.querySelector('main').innerText");keep=page.evaluate('data.commentUse')
+  used.append(next((w for w in ('alpha','beta','gamma') if w in rows),None) if r.get('performed') else None)
+ check('comment variants: three videos get three different comments, and the fourth starts a new round with another one',None not in used and len(set(used[:3]))==3 and used[3]!=used[2])
+ fixture(VIDEO);r=step(action='comment',dry=True,comment='alpha\nbeta',commentMany=True,commentList=['alpha','beta'],commentSeed='s');check('comment variants: the preview says one of your comments, and types nothing',bool(r.get('preview')) and 'one of your 2 comments' in r.get('message','') and page.locator('textarea').input_value()=='')
  fixture(VIDEO);r=step(kind='users',action='follow',source='commenters') if False else page.evaluate('''()=>new Promise(resolve=>listeners[0]({action:'step',step:{kind:'users',source:'commenters',url:location.href},config:{scanLimit:1},jobId:'test'},{id:'extension'},resolve))''');check('commenter discovery excludes video author',r.get('users')==['bob'])
  fixture(VIDEO);r=step(url='https://www.tiktok.com/@other/video/456');check('navigation mismatch prevents action',bool(r.get('error')) and page.evaluate('clicks')==0)
  fixture(VIDEO);page.evaluate("data.job.status='paused'");r=step(dry=False);check('paused task never clicks',bool(r.get('error')) and page.evaluate('clicks')==0)

@@ -39,3 +39,16 @@ test('every action x source plans the intended steps and addresses',()=>{
    unfollow:{users:'account /@alice | account /@bob',posts:'REJECTED',hashtag:'REJECTED',discover:'REJECTED',followers:'REJECTED',following:'REJECTED',commenters:'REJECTED'}};
   for(const a of Object.keys(WANT))for(const k of Object.keys(WANT[a]))assert.equal(plan(a,k),WANT[a][k],a+' x '+k);
 });
+
+// ---- Follow + like
+// results come from another realm (vm), so compare them as JSON
+const same=(a,b)=>assert.equal(JSON.stringify(a),JSON.stringify(b));
+const FL=(extra={})=>config({action:'followlike',...extra});
+test('follow + like is an accepted action; unfollow rules are unchanged',()=>{assert.equal(FL().action,'followlike');assert.throws(()=>config({action:'unfollow',mode:'hashtag',target:'#x'}));});
+test('follow + like on a profile list plans a follow step, then a like walk, for each profile',()=>{const s=E.initial(FL({target:'alice, bob'}));same(s.map(x=>[x.username,x.kind,x.act]),[['alice','account','follow'],['alice','walk','like'],['bob','account','follow'],['bob','walk','like']]);assert.ok(s.every(x=>x.url.startsWith('https://www.tiktok.com/@')));});
+test('follow + like on direct video links likes each video, then follows its author',()=>{const s=E.initial(FL({mode:'posts',target:'https://www.tiktok.com/@alice/video/111, https://www.tiktok.com/@bob/photo/222'}));same(s.map(x=>[x.kind,x.act]),[['engage','like'],['author','follow'],['engage','like'],['author','follow']]);assert.equal(s[0].url,s[1].url);});
+test('follow + like on a hashtag walks the page twice in place: one pass likes, one pass follows the authors',()=>{const s=E.initial(FL({mode:'hashtag',target:'#printify'}));same(s.map(x=>[x.kind,x.act,x.url]),[['walk','like','https://www.tiktok.com/tag/printify'],['walk','follow','https://www.tiktok.com/tag/printify']]);});
+test('follow + like on a discover page also walks twice',()=>{const s=E.initial(FL({mode:'hashtag',target:'https://www.tiktok.com/discover/printify-como-funciona-en-mexico'}));same(s.map(x=>[x.kind,x.act]),[['walk','like'],['walk','follow']]);});
+test('follow + like on followers collects the accounts first, then follows and likes each',()=>{const c=FL({mode:'followers',target:'@alice'});const first=E.initial(c);assert.equal(first.length,1);assert.equal(first[0].kind,'users');const more=E.expand({config:c},first[0],{users:['carol','dave']});same(more.map(x=>[x.username,x.kind,x.act]),[['carol','account','follow'],['carol','walk','like'],['dave','account','follow'],['dave','walk','like']]);});
+test('follow + like: the author of a video is followed only (the like was already done on the video)',()=>{const c=FL({mode:'posts',target:'https://www.tiktok.com/@alice/video/111'});const more=E.expand({config:c},{kind:'author'},{users:['alice']});same(more.map(x=>[x.username,x.kind,x.act]),[['alice','account','follow']]);});
+test('the other actions still plan exactly one step per target (nothing carries an act)',()=>{for(const action of ['like','follow','comment'])assert.ok(E.initial(config({action,target:'alice',comment:'Nice!'})).every(x=>x.act===undefined));});

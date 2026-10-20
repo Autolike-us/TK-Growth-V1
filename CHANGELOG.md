@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0 — Follow + like and different comments
+- **Follow + like**: a new action. For profiles it follows each account and then likes its videos; for a hashtag or discover page it walks the page once to like and once to follow the authors; for video links it likes each video and follows its author. Both actions count toward the task limit and the daily cap.
+- **A different comment on each video**: write one comment per line (up to 150 characters each) and tick the new box; Aurora picks one at random for each video and does not repeat a comment until all have been used.
+
 ## 1.1.0 — New popup and a fresher dashboard
 - The toolbar popup is now a small status card: what is running, Pause / Stop, today's count against your daily limit, your license, and **Open dashboard**. It cannot start or resume anything.
 - Everything else (new tasks, saved setups, history, debug log) lives in the full dashboard tab, which opens from the popup. It re-uses the tab if it is already open.
