@@ -29,8 +29,8 @@ globalThis.AuroraEngine = {
   postSteps(url,c){const label='post '+String(AuroraSelectors.pageKey(url)||'').replace(/^post:/,'');if(c.action==='followlike')return [{kind:'engage',act:'like',url,label},{kind:'author',act:'follow',url,label}];return [{kind:c.action==='follow'?'author':'engage',url,label}];},
   initial(c) {
     const steps=this.initialOne(c);
-    // "Follow + like" on a hashtag page: one in-place walk that likes, then one that follows the authors.
-    return c.action==='followlike'&&['hashtag','explore'].includes(c.mode)?steps.flatMap(x=>x.kind==='walk'?[{...x,act:'like',label:x.label+' · like'},{...x,act:'follow',label:x.label+' · follow'}]:[x]):steps;
+    // "Follow + like" on a hashtag/explore page: ONE in-place walk that likes each video and follows its author.
+    return c.action==='followlike'&&['hashtag','explore'].includes(c.mode)?steps.map(x=>x.kind==='walk'?{...x,act:'followlike',label:x.label+' · follow + like'}:x):steps;
   },
   initialOne(c) {
     // The Explore feed needs no target: walk its videos in place (TikTok's personal For You feed cannot be walked safely).

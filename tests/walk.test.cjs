@@ -62,5 +62,7 @@ try{const ctx=await browser.newContext();
  check('follow on a hashtag presses each video author\'s Follow button in place (skipping an author already followed and a repeat) and never a suggestion\'s',r.performed&&r.count===3&&/Followed the authors of 3 videos from #printify/.test(r.message)&&await pg.evaluate(()=>JSON.stringify(follows)===JSON.stringify(['ann','cy','dee'])&&decoyClicks===0&&!document.querySelector('[data-e2e="browse-video-container"]')));
  ({r,pg}=await run(FTAG,{action:'follow',mode:'hashtag',scanLimit:5,limit:10,dry:true},fstep));check('follow preview checks authors without pressing Follow',r.preview&&r.count===3&&await pg.evaluate(()=>follows.length===0));
  ({r,pg}=await run(FTAG,{action:'follow',mode:'hashtag',scanLimit:5,limit:2},fstep));check('the task limit caps how many authors are followed',r.performed&&r.count===2&&await pg.evaluate(()=>JSON.stringify(follows)===JSON.stringify(['ann','cy'])));
+ ({r,pg}=await run(FTAG,{action:'followlike',mode:'hashtag',scanLimit:4,limit:4},fstep));
+ check('follow + like in ONE walk: every video is liked AND its author followed, counted separately, and the limit does not starve the like half',r.performed&&r.count===4&&r.likes===4&&r.follows===2&&await pg.evaluate(()=>clicks===4&&JSON.stringify(follows)===JSON.stringify(['ann','cy'])));
  console.log('\n'+passed+' walk checks passed');
 }finally{await browser.close();}})().catch(e=>{console.error(e);process.exit(1);});

@@ -193,15 +193,28 @@
   tile.scrollIntoView({block:'center',behavior:'instant'});await think(700,1500);await active(id);tile.click();
   if(!await until(()=>{if(!inVideo())return false;const r=videoRoot();return r&&D.author(r);},id,15000))throw Error('The first video did not open. Check the task tab and resume.');
   let acted=0,lastSkip='',skippedLiked=0;const visited=new Set(),retried=new Set(),seenAuthors=new Set();
+  const both=c.action==='followlike',lf={likes:0,follows:0};
+  // Follow + like: on each video like it, then follow its author; either half may be skipped (already liked / already following).
+  const likeFollow=async root=>{
+   const res=[];let err=null;const ok=x=>x&&(x.performed||x.preview);const author=D.author(root);
+   try{res[0]=await postAction({...c,action:'like'},id,root,actor);}catch(e){err=e;res[0]={message:'Skipped: like failed ('+e.message+')'};}
+   if(author&&!seenAuthors.has(author)){seenAuthors.add(author);
+    if(res[0].performed){await think(1500,3000);await active(id);}
+    try{res[1]=await postAction({...c,action:'follow'},id,videoRoot()||root,actor);}catch(e){err=err||e;res[1]={message:'Skipped: follow failed ('+e.message+')'};}
+   }else res[1]={message:author?'Skipped: this author was already handled.':'Skipped: could not identify the author.'};
+   if(ok(res[0]))lf.likes++;if(ok(res[1]))lf.follows++;
+   if(!ok(res[0])&&!ok(res[1])&&err)throw err;
+   return {performed:!!(res[0].performed||res[1].performed),preview:!!(res[0].preview||res[1].preview),message:res.map(x=>x&&x.message).filter(Boolean).join(' ')};
+  };
   try{
    for(let i=0;i<max*4+6&&acted<max;i++){
     await active(id);
     const key=S.pageKey(location.href);if(!inVideo()||visited.has(key))break;visited.add(key);
-    await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action==='like'?D.likeCandidates(r).length:c.action==='follow'?authorFollow(r):true);},id,12000);
+    await until(()=>{const r=videoRoot();return r&&D.author(r)&&(c.action==='like'||c.action==='followlike'?D.likeCandidates(r).length:c.action==='follow'?authorFollow(r):true);},id,12000);
     const root=videoRoot();if(!root)throw Error('Lost the open video. Check the task tab and resume.');
     T('walk video',key);await progress(id,acted,label+': video '+visited.size+' — '+(c.dry?'checking':c.action==='comment'?'commenting':c.action==='follow'?'following':'liking')+'…',0,visited.size,max);
     let r;const who=c.action==='follow'?D.author(root):null;
-    if(who&&seenAuthors.has(who))r={message:'Skipped: this author was already handled.'};else{if(who)seenAuthors.add(who);
+    if(both)r=await likeFollow(root);else if(who&&seenAuthors.has(who))r={message:'Skipped: this author was already handled.'};else{if(who)seenAuthors.add(who);
     try{r=await postAction(c,id,root,actor);}
     catch(e){
      if(c.action!=='comment'||!/comment box disappeared/.test(String(e.message))||retried.has(key))throw e;
@@ -229,6 +242,7 @@
   if(!acted)return {message:`Skipped ${label}: ${lastSkip||'nothing eligible'}.`};
   const extra=skippedLiked?` (${skippedLiked} already liked skipped)`:'';
   const where=name?'on @'+name:'from '+label;
+  if(both)return c.dry?{preview:true,count:acted,message:`Preview: would like ${lf.likes} and follow ${lf.follows} authors from ${acted} video${acted===1?'':'s'} ${where}. Nothing changed.`}:{performed:true,count:acted,likes:lf.likes,follows:lf.follows,message:`Liked ${lf.likes} video${lf.likes===1?'':'s'} and followed ${lf.follows} author${lf.follows===1?'':'s'} ${where}.`};
   return c.dry?{preview:true,count:acted,message:`Preview: would ${c.action==='comment'?'comment on':c.action==='follow'?'follow the authors of':'like'} ${acted} video${acted===1?'':'s'} ${where}${extra}. Nothing changed.`}:{performed:true,count:acted,message:`${verb[0].toUpperCase()+verb.slice(1)} ${acted} video${acted===1?'':'s'} ${where}${extra}.`};
  }
  // Makes sure the open list shows the wanted tab (Following / Followers).

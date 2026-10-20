@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2 — Follow + like fix
+- Fixed: "Follow + like" on a hashtag, discover page or the Explore feed never liked anything — the follow pass used up the whole task limit first. It is now one pass: each video is liked and its author followed, then Aurora moves on. The limit counts videos, and the Live session shows how many were liked and followed.
+
 ## 1.2.1 — Explore feed
 - **Explore feed** is a new source: Aurora opens TikTok's Explore page and walks its videos (like, comment, follow, or follow + like). No target needed. The personal For You page is not used because it cannot be read safely.
 
