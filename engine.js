@@ -13,13 +13,13 @@ globalThis.AuroraEngine = {
       if(!Number.isInteger(c[key])||c[key]<min||c[key]>max)throw Error(`Check ${key}: enter a whole number from ${min} to ${max}.`);
     }
     if(c.maxAge || c.videos)throw Error('Post age and skip-video filters are unavailable for TikTok.');
-    if(!['users','posts','hashtag','followers','following','commenters'].includes(c.mode))throw Error('Choose a supported TikTok discovery source.');
+    if(!['users','posts','hashtag','followers','following','commenters','explore'].includes(c.mode))throw Error('Choose a supported TikTok discovery source.');
     c.exclude=String(c.exclude||'').split(/[\s,]+/).filter(Boolean).map(x=>this.profile(x));c.comment=String(c.comment||'').trim();
     c.commentMany=c.commentMany===true&&c.action==='comment';delete c.commentList;delete c.commentSeed;
     // "A different comment on each post": one comment per line, each checked on its own.
     if(c.commentMany){const list=[];for(const line of String(c.comment).split(/\r?\n/)){const t=line.replace(/\s+/g,' ').trim();if(t&&!list.some(x=>x.toLowerCase()===t.toLowerCase()))list.push(t);}if(list.length<2)throw Error('Different comments: write at least two comments, one per line, or untick “different comment on each post”.');if(list.some(x=>x.length>150))throw Error('Each comment must be 1–150 characters.');c.commentList=list;c.commentSeed=crypto.randomUUID();c.comment=list[0];}
     else if(c.action==='comment'&&(!c.comment||c.comment.length>150))throw Error('Enter your comment text (1–150 characters).');
-    if(c.action==='unfollow'&&c.mode!=='users')throw Error('Unfollow uses your explicit profile/user list.');return c;
+    if(c.mode==='explore'&&c.action==='unfollow')throw Error('The Explore feed cannot be used to unfollow.');if(c.action==='unfollow'&&c.mode!=='users')throw Error('Unfollow uses your explicit profile/user list.');return c;
   },
   // Like/comment walk a profile in place: open its first video, act, press the next-video arrow, repeat (no per-video page loads).
   profileStep(name,c){return {label:'@'+name,kind:['follow','unfollow'].includes(c.action)?'account':'walk',url:`https://www.tiktok.com/@${name}`,username:name};},
@@ -30,9 +30,11 @@ globalThis.AuroraEngine = {
   initial(c) {
     const steps=this.initialOne(c);
     // "Follow + like" on a hashtag page: one in-place walk that likes, then one that follows the authors.
-    return c.action==='followlike'&&c.mode==='hashtag'?steps.flatMap(x=>x.kind==='walk'?[{...x,act:'like',label:x.label+' · like'},{...x,act:'follow',label:x.label+' · follow'}]:[x]):steps;
+    return c.action==='followlike'&&['hashtag','explore'].includes(c.mode)?steps.flatMap(x=>x.kind==='walk'?[{...x,act:'like',label:x.label+' · like'},{...x,act:'follow',label:x.label+' · follow'}]:[x]):steps;
   },
   initialOne(c) {
+    // The Explore feed needs no target: walk its videos in place (TikTok's personal For You feed cannot be walked safely).
+    if(c.mode==='explore')return [{label:'the Explore feed',kind:'walk',url:'https://www.tiktok.com/explore'}];
     const value=String(c.target||'').trim();if(!value)throw Error('Enter a target.');
     const post=s=>{const url=AuroraSelectors.postURL(s);if(!url)throw Error('Enter valid TikTok video or photo URLs.');return url;};
     switch(c.mode){
@@ -51,7 +53,7 @@ globalThis.AuroraEngine = {
   expand(job,step,result){
     const c=job.config;job.seenUsers??=[];job.seen??=[];
     if(step.kind==='users'||step.kind==='author'){const users=[...new Set(result.users||[])].map(x=>this.profile(x)).filter(x=>!c.exclude.includes(x)&&!job.seenUsers.includes(x)).slice(0,c.scanLimit);job.seenUsers.push(...users);return users.flatMap(x=>this.profileSteps(x,c,step.kind==='author'?'follow':undefined));}
-    if(step.kind==='posts'){const limit=c.mode==='hashtag'?c.scanLimit:c.perUser;const urls=[...new Set((result.posts||[]).map(x=>AuroraSelectors.postURL(x)).filter(Boolean))].filter(x=>!job.seen.includes(x)).slice(0,limit);job.seen.push(...urls);return urls.flatMap(url=>this.postSteps(url,c));}
+    if(step.kind==='posts'){const limit=c.mode==='hashtag'||c.mode==='explore'?c.scanLimit:c.perUser;const urls=[...new Set((result.posts||[]).map(x=>AuroraSelectors.postURL(x)).filter(Boolean))].filter(x=>!job.seen.includes(x)).slice(0,limit);job.seen.push(...urls);return urls.flatMap(url=>this.postSteps(url,c));}
     return [];
   }
 };

@@ -1,10 +1,10 @@
 const $=id=>document.getElementById(id); const fields=['action','comment','commentMany','scanLimit','mode','target','perUser','limit','delay','maxAge','dailyCap','exclude','dry','videos'];
-const hints={users:'Separate usernames with commas or new lines.',followers:'One username. Loads available accounts from the follower dialog up to the discovery limit.',following:'One username. Loads available accounts from the following dialog up to the discovery limit.',commenters:'Paste a TikTok video or photo URL. Discovers currently rendered commenters.',hashtag:'Enter one #hashtag, its TikTok /tag/ URL, or a TikTok discover page link.',posts:'Paste TikTok video or photo URLs, separated by commas or new lines.'};
+const hints={users:'Separate usernames with commas or new lines.',followers:'One username. Loads available accounts from the follower dialog up to the discovery limit.',following:'One username. Loads available accounts from the following dialog up to the discovery limit.',commenters:'Paste a TikTok video or photo URL. Discovers currently rendered commenters.',explore:'Works down TikTok’s Explore page: opens the first video and moves to the next one. No target needed. (The personal For You page is not used because it cannot be read safely.)',hashtag:'Enter one #hashtag, its TikTok /tag/ URL, or a TikTok discover page link.',posts:'Paste TikTok video or photo URLs, separated by commas or new lines.'};
 function settings(){return Object.fromEntries(fields.map(k=>[k,$(k).type==='checkbox'?$(k).checked:$(k).value]));}
 let licenseOk=true,jobActive=false;const canRun=()=>licenseOk||$('dry').checked,refreshStart=()=>{$('start').disabled=jobActive||!canRun();};
 function notice(s){$('notice').textContent=s;}
 async function send(action,data={}){try{const r=await chrome.runtime.sendMessage({action,...data});if(!r?.ok)throw Error(r?.error||'No response');notice(r.message||'Saved.');await render();return true;}catch(e){notice(e.message);return false;}}
-const DISCOVERY=['followers','following','commenters','likers','hashtag','location'],PROFILE_POSTS=['users','followers','following','commenters','likers'];
+const DISCOVERY=['followers','following','commenters','likers','hashtag','location','explore'],PROFILE_POSTS=['users','followers','following','commenters','likers'];
 function updateForm(){
  const action=$('action').value,unfollow=action==='unfollow',post=['like','comment','followlike'].includes(action);
  for(const option of $('mode').options)option.disabled=unfollow&&option.value!=='users';
@@ -24,6 +24,7 @@ function updateForm(){
  document.querySelector('label[for="target"]').textContent=unfollow?'Usernames to unfollow':'Target';
  document.querySelector('label[for="perUser"]').textContent=action==='comment'?'Videos to comment on per profile':'Videos to like per profile';
  paintMode();
+ {const ex=!unfollow&&mode==='explore';$('target').hidden=ex;document.querySelector('label[for="target"]').hidden=ex;$('target').required=!ex;}
  $('target').placeholder=({hashtag:'#travel, a hashtag URL or a discover link',posts:'Video URLs',commenters:'A video URL'})[mode]||'@username, one or more usernames';
 }
 $('mode').onchange=()=>{disarm();updateForm();};$('commentMany').addEventListener('change',()=>{disarm();updateForm();});$('action').onchange=()=>{disarm();updateForm();rememberForm();};
@@ -110,7 +111,7 @@ const targetList=()=>[...new Set($('target').value.split(/[,\n]+/).map(s=>s.trim
 
 // ---- one-line summary above Start, plus the collapsed-section captions ----
 function paintSummary(){
- const dry=$('dry').checked,action=$('action').value,mode=$('mode').value,n=targetList().length;
+ const dry=$('dry').checked,action=$('action').value,mode=$('mode').value,n=mode==='explore'&&action!=='unfollow'?1:targetList().length;
  const perUser=Number($('perUser').value)||1,limit=Number($('limit').value)||1,delay=Number($('delay').value)||20,cap=Number($('dailyCap').value)||0;
  const post=['like','comment','followlike'].includes(action),perTarget=post&&PROFILE_POSTS.includes(mode),discover=action!=='unfollow'&&DISCOVERY.includes(mode);
  const steps=n?Math.min(limit,perTarget&&!discover?n*perUser:discover?limit:n):0,secs=Math.round(steps*delay*1.2+n*6);

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1 — Explore feed
+- **Explore feed** is a new source: Aurora opens TikTok's Explore page and walks its videos (like, comment, follow, or follow + like). No target needed. The personal For You page is not used because it cannot be read safely.
+
 ## 1.2.0 — Follow + like and different comments
 - **Follow + like**: a new action. For profiles it follows each account and then likes its videos; for a hashtag or discover page it walks the page once to like and once to follow the authors; for video links it likes each video and follows its author. Both actions count toward the task limit and the daily cap.
 - **A different comment on each video**: write one comment per line (up to 150 characters each) and tick the new box; Aurora picks one at random for each video and does not repeat a comment until all have been used.
