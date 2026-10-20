@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.2 — Follow + like fix
+- Fixed: "Follow + like" on a hashtag, discover page or the Explore feed never liked anything — the follow pass used up the whole task limit first. It is now one pass: each video is liked and its author followed, then Aurora moves on. The limit counts videos, and the Live session shows how many were liked and followed.
+
+## 1.2.1 — Explore feed
+- **Explore feed** is a new source: Aurora opens TikTok's Explore page and walks its videos (like, comment, follow, or follow + like). No target needed. The personal For You page is not used because it cannot be read safely.
+
+## 1.2.0 — Follow + like and different comments
+- **Follow + like**: a new action. For profiles it follows each account and then likes its videos; for a hashtag or discover page it walks the page once to like and once to follow the authors; for video links it likes each video and follows its author. Both actions count toward the task limit and the daily cap.
+- **A different comment on each video**: write one comment per line (up to 150 characters each) and tick the new box; Aurora picks one at random for each video and does not repeat a comment until all have been used.
+
+## 1.1.0 — New popup and a fresher dashboard
+- The toolbar popup is now a small status card: what is running, Pause / Stop, today's count against your daily limit, your license, and **Open dashboard**. It cannot start or resume anything.
+- Everything else (new tasks, saved setups, history, debug log) lives in the full dashboard tab, which opens from the popup. It re-uses the tab if it is already open.
+- The dashboard has a calmer look in light and dark, a fourth **Today** card and a Help & support link.
+- Nothing about how tasks run has changed: previews, confirmations, pacing, receipts and pause-on-problems are exactly as in 1.0.1.
+
 ## 1.0.1
 - New: Telegram channel "Aurora Studios Report" for bug reports, feature requests and ideas — linked in the footer of the studio and the toolbar popup (next to Report an issue and Contact us).
 

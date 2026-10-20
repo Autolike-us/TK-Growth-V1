@@ -69,15 +69,6 @@ try{
  await ui.click('#debugTab');check('opening Debug log clears its dot',!await vis(ui,'#debugDot'));
  await ui.click('#firstRunOk').catch(()=>{});
  await ctx.close();
- // popup layout
- const {ctx:pc,pg:pp}=await open('popup.html',{width:760,height:600});
- let overlap=false;for(const y of [0,150,300,600,900,1500]){await pp.evaluate(y=>window.scrollTo(0,y),y);const r=await pp.evaluate(()=>({l:document.querySelector('article.live').getBoundingClientRect().bottom,s:document.querySelector('article.setups').getBoundingClientRect().top}));if(r.s<r.l-1)overlap=true;}
- check('popup: Saved setups never overlaps Live session',!overlap);
- await pp.evaluate(()=>window.scrollTo(0,0));
- const bars=await pp.evaluate(()=>({inner:[...document.querySelectorAll('body *')].filter(e=>/auto|scroll/.test(getComputedStyle(e).overflowY)&&e.scrollHeight>e.clientHeight+2).map(e=>e.tagName),side:document.documentElement.scrollWidth>document.documentElement.clientWidth+1}));
- check('popup: single scrollbar, no horizontal scroll',bars.inner.length===0&&!bars.side);
- check('popup: nothing is fixed or sticky',await pp.evaluate(()=>[...document.querySelectorAll('body *')].every(e=>!['fixed','sticky'].includes(getComputedStyle(e).position))));
- await pc.close();
  // on-page panel loads without errors
  const pctx=await browser.newContext(),pn=await pctx.newPage();pn.on('pageerror',e=>{throw e;});await pn.setContent('<html><body></body></html>');await pn.evaluate(stub);
  await pn.addScriptTag({content:'globalThis.AuroraSelectors=globalThis.AuroraSelectors||{profileName:()=>null};'});await pn.addScriptTag({content:read('report.js')});await pn.addScriptTag({content:read('panel.js')});await pn.waitForTimeout(200);

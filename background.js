@@ -55,11 +55,11 @@ async function finish(job){
 }
 // Send a step to the task tab; if the content script is missing (extension reloaded, tab opened earlier), attach it once and retry.
 async function sendStep(job,step){
- const msg={action:'step',step,config:job.config,jobId:job.id};
+ const msg={action:'step',step,config:step.act?{...job.config,action:step.act}:job.config,jobId:job.id};
  try{return await chrome.tabs.sendMessage(job.tabId,msg);}
  catch(err){
   await dlog('warn','Page script not reachable, re-attaching it',String(err?.message||err));
-  try{await chrome.scripting.executeScript({target:{tabId:job.tabId},files:['selectors.js','dom.js','content.js']});return await chrome.tabs.sendMessage(job.tabId,msg);}
+  try{await chrome.scripting.executeScript({target:{tabId:job.tabId},files:['selectors.js','dom.js','comments.js','content.js']});return await chrome.tabs.sendMessage(job.tabId,msg);}
   catch(err2){throw Error('TikTok content script is unavailable. Refresh the task tab and resume.'+(err2?.message?' ('+String(err2.message).slice(0,120)+')':''));}
  }
 }
@@ -94,7 +94,7 @@ async function tick(){
   if(['walk','account','engage','listfollow'].includes(step.kind))closeStep(job,step,r);else job.total=Math.max((job.finished?.length||0),(job.total||0)-1+more.length);
   let gap=quick();
   if(['users','posts','author'].includes(step.kind))job.message=`Discovered ${more.length} ${step.kind==='posts'?'posts':'profiles'}. ${r.note||''}`;
-  else{if(r.performed||r.preview){const n=['walk','listfollow'].includes(step.kind)?Math.max(1,r.count||1):1;gap=pause(job);job.done=(job.done||0)+n;if(r.performed){job.counts[job.config.action]+=n;for(let i=0;i<n;i++)await bumpDaily();}else job.previewed+=n;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
+  else{if(r.performed||r.preview){const n=['walk','listfollow'].includes(step.kind)?Math.max(1,r.count||1):1;gap=pause(job);job.done=(job.done||0)+n;if(r.performed){if(r.likes!==undefined){job.counts.like+=r.likes;job.counts.follow+=r.follows||0;}else job.counts[step.act||job.config.action]+=n;for(let i=0;i<n;i++)await bumpDaily();}else job.previewed+=n;}else job.skipped++;job.liked=job.counts.like;job.message=r.message;}
   await log(job.message,step.url);await dlog('info','→ '+job.message,/^Skipped/.test(job.message||'')?ctx(r):undefined);
   if(!job.queue.length||(job.done||0)>=job.config.limit){await finish(job);return;}
   job.nextAt=Date.now()+gap;await save(job);await schedule(job);
@@ -140,7 +140,7 @@ chrome.runtime.onMessage.addListener((m,s,respond)=>{
    if(busy)throw Error('A step is finishing. Try again shortly.');const old=(await chrome.storage.local.get('job')).job;if(['running','paused'].includes(old?.status))throw Error('Stop the current task first.');
    const config=AuroraEngine.config(m.config),queue=AuroraEngine.initial(config);if(!queue.length)throw Error('All targets are excluded.');
    await chrome.storage.local.set({config:m.config});const tab=await taskTab(queue[0].url);
-   const job={version:2,id:crypto.randomUUID(),config,queue,total:queue.length,finished:[],tabId:tab.id,status:'running',counts:{like:0,follow:0,unfollow:0,comment:0},done:0,liked:0,previewed:0,skipped:0,seen:[],seenUsers:[],nextAt:Date.now()+2000,message:`${config.dry?'Preview':'Live'} ${config.action} task started. Waiting for TikTok.`};
+   const job={version:2,id:crypto.randomUUID(),config,queue,total:queue.length,finished:[],tabId:tab.id,status:'running',counts:{like:0,follow:0,unfollow:0,comment:0},done:0,liked:0,previewed:0,skipped:0,seen:[],seenUsers:[],nextAt:Date.now()+2000,message:`${config.dry?'Preview':'Live'} ${config.action==='followlike'?'follow + like':config.action} task started. Waiting for TikTok.`};
    await save(job);await log(job.message);await dlog('info',job.message,{action:config.action,mode:config.mode,target:String(config.target||'').slice(0,200),limit:config.limit,perUser:config.perUser,scanLimit:config.scanLimit,delay:config.delay,dailyCap:config.dailyCap,preview:config.dry,steps:queue.length});await schedule(job);return{ok:true,message:job.message};
   }
   if(m.action==='captchaCleared'){const {job}=await chrome.storage.local.get('job');if(!job||job.status!=='paused'||!job.waitingCaptcha||s.tab?.id!==job.tabId)return{ok:false};await dlog('info','Captcha solved, continuing');return resumeTask();}

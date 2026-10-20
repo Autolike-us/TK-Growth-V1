@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Aurora • TikTok Studio",
-  "version": "1.0.1",
+  "version": "1.2.2",
   "description": "Personal TikTok discovery, likes, follows, unfollows and comments with preview and local history.",
   "permissions": [
     "storage",
@@ -37,6 +37,7 @@
         "selectors.js",
         "dom.js",
         "report.js",
+        "comments.js",
         "content.js",
         "license-config.js",
         "license.js",
