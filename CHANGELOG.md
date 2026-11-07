@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3 — Move or hide the Aurora button
+- **Move it**: drag the floating Aurora button to any corner of the page. Aurora remembers the spot, and the panel opens up or down so it never goes off screen. Double-click the button to put it back.
+- **Hide it**: a small × next to the button hides it. Turn it back on with the checkbox "Show the Aurora button on pages" in the toolbar popup. If a task pauses and needs you, the button still appears so you do not miss it.
+
 ## 1.2.2 — Follow + like fix
 - Fixed: "Follow + like" on a hashtag, discover page or the Explore feed never liked anything — the follow pass used up the whole task limit first. It is now one pass: each video is liked and its author followed, then Aurora moves on. The limit counts videos, and the Live session shows how many were liked and followed.
 
